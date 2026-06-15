@@ -1,313 +1,262 @@
 ---
 layout: default
-title: Snapshots
-parent: Documentation
-nav_order: 8
+title: Snapshots & AOT
+nav_order: 5
 ---
 
-# Snapshots
+# Snapshots & AOT Compatibility
 
-Snapshots provide **AOT-safe rule persistence** by capturing compiled rule state. JIT environments create snapshots; AOT environments consume them.
+RoslynRules supports two deployment modes: **JIT (Just-In-Time)** and **AOT (Ahead-Of-Time)**. This guide explains the two-stage workflow and how to use snapshots for AOT-compatible deployments.
 
----
+## Overview
 
-## What Are Snapshots?
+| Mode | Compilation | Best For |
+|------|-------------|----------|
+| **JIT** | Rules compiled at runtime using Roslyn | Development, dynamic rule updates, server-side with full .NET runtime |
+| **AOT** | Rules pre-compiled, snapshots loaded at runtime | Native AOT deployments, trimmed/self-contained apps, iOS, WASM |
 
-A snapshot is an immutable, serializable representation of a compiled workflow or rule. It captures:
+## The Core Problem
 
-- Rule metadata (ID, description, version, expression strings)
-- Compilation results (compiled delegates)
-- Dependency chains (child rules, `DependsOnRuleId`)
+Roslyn compilation requires dynamic code generation, which is **not available** in:
+- Native AOT published apps (`PublishAot=true`)
+- Aggressively trimmed applications
+- iOS (platform restrictions)
+- Some WASM configurations
 
-Snapshots **do not** include runtime parameter values or execution results.
+**The Solution:** Pre-compile rules in a JIT environment, save them as snapshots, then load those snapshots in AOT environments.
 
----
+## Two-Stage Architecture
 
-## JIT vs AOT Roles
+```
+┌─────────────────┐                    ┌─────────────────┐
+│   JIT Stage     │   ─────────────►   │   AOT Stage     │
+│                 │   Save Snapshots   │                 │
+│  Compile rules  │                    │  Load snapshots │
+│  with Roslyn    │                    │  Execute only    │
+│                 │                    │  (no compile)    │
+└─────────────────┘                    └─────────────────┘
+   Development                            Production
+   environment                           environment
+```
 
-| Capability | JIT | AOT |
-|-----------|-----|-----|
-| Create snapshots from compiled rules | Yes | No |
-| Save snapshots to JSON/XML | Yes | No |
-| Load snapshots from JSON/XML | Yes | Yes |
-| Restore workflows from snapshots | Yes | Yes |
-| Execute restored workflows | Yes | Yes |
+## Stage 1: JIT — Create Snapshots
 
-**JIT** is the authoring/compilation environment.
-**AOT** is the execution-only environment.
-
----
-
-## Creating Snapshots (JIT Only)
-
-### From a Compiled Workflow
+In your development environment (or a build server with full .NET):
 
 ```csharp
-using RoslynRules.Snapshots;
-using RoslynRules.Json;
-
-// 1. Compile in JIT
-var workflow = JsonRuleLoader.LoadWorkflowFromFile("rules.json");
-workflow.Compile(parameters);
-
-// 2. Create snapshot
-var compiled = CompiledWorkflow.Compile(workflow, parameters);
-var snapshot = compiled.ToSnapshot();
-
-// 3. Serialize to JSON
-var serializer = new JsonSnapshotSerializer();
-var json = serializer.Serialize(snapshot);
-File.WriteAllText("workflow.snap.json", json);
-```
-
-### Using SnapshotManager
-
-```csharp
-// Compile + snapshot in one call
-var snapshot = SnapshotManager.CompileAndSnapshot(
-    workflow,
-    parameters,
-    additionalNamespaces: new[] { "MyApp.Models" }
-);
-
-// Save to file
-SnapshotManager.SaveSnapshot(snapshot, serializer, "workflow.snap.json");
-```
-
----
-
-## Loading Snapshots (AOT Safe)
-
-### From JSON
-
-```csharp
-// AOT-safe: no compilation, no reflection
-var serializer = new JsonSnapshotSerializer();
-var snapshot = SnapshotManager.LoadSnapshot(serializer, "workflow.snap.json");
-
-// Restore workflow (rules are NOT compiled)
-var workflow = SnapshotManager.RestoreWorkflow(snapshot);
-```
-
-### From XML
-
-```csharp
-var serializer = new XmlSnapshotSerializer();
-var snapshot = SnapshotManager.LoadSnapshot(serializer, "workflow.snap.xml");
-var workflow = SnapshotManager.RestoreWorkflow(snapshot);
-```
-
----
-
-## Two-Stage Deployment
-
-```
-[JIT Tool]         Compile()       [Snapshot Files]
-   |            ---------------->        |
-   |           ToSnapshot()             | LoadSnapshot()
-   |                                    v
-   |                              [AOT App]
-   |                              Execute()
-```
-
-**JIT Authoring Tool:**
-- Loads rules from JSON/XML/EF
-- Compiles expressions with ExpressionCompiler
-- Saves snapshots
-- Can modify and recompile
-
-**AOT Production App:**
-- Loads snapshots at startup
-- Executes pre-compiled delegates
-- No runtime compilation
-
----
-
-## Snapshot Formats
-
-| Format | Serializer | AOT Safe |
-|--------|-----------|----------|
-| JSON | JsonSnapshotSerializer | Yes |
-| XML | XmlSnapshotSerializer | Yes |
-
-Both use source-generated serializers (System.Text.Json source generators, System.Xml.Linq) with no reflection.
-
----
-
-## Restoring vs Compiling
-
-Restored workflows from snapshots are **not compiled**:
-
-```csharp
-var restored = SnapshotManager.RestoreWorkflow(snapshot);
-
-// Throws: rules are not compiled
-// restored.Execute(parameters);
-
-// JIT only: compile after restoring
-var compiled = SnapshotManager.RestoreAndCompile(restored, parameters);
-var results = compiled.Execute(parameters);
-```
-
-In AOT, you **cannot** compile.
-
----
-
-## Examples
-
-### Example 1: Full JIT Compile → Snapshot → Save → Load → Execute
-
-```csharp
+using RoslynRules;
 using RoslynRules.Models;
 using RoslynRules.Snapshots;
-using RoslynRules.Json;
+using RoslynRules.Json; // or RoslynRules.Xml
 
-// Step 1: Create a workflow with rules
+// 1. Define your workflow
 var workflow = new Workflow
 {
-    Description = "Order validation",
+    Description = "Order Validation",
     Rules =
     {
         new Rule
         {
-            Description = "Minimum order amount",
-            Expression = "order.Total >= 10.00",
-            IsActive = true
+            Description = "Check order total",
+            Expression = "order.Total > 0",
+            Action = "result.IsValid = true",
+            Priority = 10
         },
         new Rule
         {
-            Description = "Customer exists",
-            Expression = "customer != null",
-            IsActive = true
+            Description = "Check customer status",
+            Expression = "customer.IsActive",
+            DependsOnRuleId = previousRule.Id
         }
     }
 };
 
-// Step 2: Compile (JIT only)
+// 2. Compile the workflow (JIT only)
 var parameters = new[]
 {
-    new RuleParameter("order", typeof(Order)),
-    new RuleParameter("customer", typeof(Customer))
+    new RuleParameter("order", typeof(Order), null),
+    new RuleParameter("customer", typeof(Customer), null)
 };
+
 workflow.Compile(parameters);
 
-// Step 3: Create snapshot
-var compiled = CompiledWorkflow.Compile(workflow, parameters);
-var snapshot = compiled.ToSnapshot();
+// 3. Create a snapshot
+var snapshot = SnapshotManager.CreateSnapshot(
+    CompiledWorkflow.Compile(workflow, parameters));
 
-// Step 4: Save to JSON
+// 4. Save to file (AOT-safe format)
 var serializer = new JsonSnapshotSerializer();
-SnapshotManager.SaveSnapshot(snapshot, serializer, "order-rules.snap.json");
-
-// Step 5: Later... load snapshot (AOT safe)
-var loadedSnapshot = SnapshotManager.LoadSnapshot(serializer, "order-rules.snap.json");
-var restoredWorkflow = SnapshotManager.RestoreWorkflow(loadedSnapshot);
-
-// Step 6: Execute with data
-var order = new Order { Total = 25.00m };
-var customer = new Customer { Name = "Alice" };
-var results = restoredWorkflow.Execute(
-    new RuleParameter("order", typeof(Order), order),
-    new RuleParameter("customer", typeof(Customer), customer)
-);
-
-foreach (var result in results)
-{
-    Console.WriteLine($"{result.RuleDescription}: {result.IsSuccess}");
-}
+SnapshotManager.SaveSnapshot(snapshot, serializer, "orders.snapshot.json");
 ```
 
-### Example 2: Child Rules and Dependencies
+### Key Points for JIT Stage
+
+- ✅ Can use `Workflow.Compile()` — full Roslyn compilation
+- ✅ Can create snapshots with `SnapshotManager.CreateSnapshot()`
+- ✅ Can save to JSON, XML, or custom formats
+- ❌ Requires full .NET runtime (no AOT)
+
+## Stage 2: AOT — Load and Execute
+
+In your production AOT environment:
 
 ```csharp
-var parentRule = new Rule
-{
-    Description = "Parent check",
-    Expression = "account.Balance > 0"
-};
+using RoslynRules.Snapshots;
+using RoslynRules.Json;
 
-var childRule = new Rule
-{
-    Description = "Overdraft protection",
-    Expression = "account.Balance >= -100",
-    DependsOnRuleId = parentRule.Id
-};
+// 1. Load the snapshot (no compilation needed!)
+var serializer = new JsonSnapshotSerializer();
+var snapshot = SnapshotManager.LoadSnapshot(serializer, "orders.snapshot.json");
 
-parentRule.ChildRules.Add(childRule);
-
-var workflow = new Workflow
-{
-    Description = "Account validation",
-    Rules = { parentRule }
-};
-
-// Compile and snapshot
-var parameters = new[] { new RuleParameter("account", typeof(Account)) };
-var compiled = CompiledWorkflow.Compile(workflow, parameters);
-var snapshot = compiled.ToSnapshot();
-
-// Serialize to XML
-var xmlSerializer = new XmlSnapshotSerializer();
-var xml = xmlSerializer.Serialize(snapshot);
-File.WriteAllText("account-rules.snap.xml", xml);
-```
-
-### Example 3: XML Round-Trip
-
-```csharp
-using RoslynRules.Xml;
-
-// Create and compile
-var workflow = new Workflow
-{
-    Description = "XML test",
-    Rules = { new Rule { Description = "R1", Expression = "x > 0" } }
-};
-var param = new RuleParameter("x", typeof(int), 1);
-var compiled = CompiledWorkflow.Compile(workflow, new[] { param });
-
-// Snapshot → XML → file
-var snapshot = SnapshotManager.CreateSnapshot(compiled);
-var serializer = new XmlSnapshotSerializer();
-SnapshotManager.SaveSnapshot(snapshot, serializer, "test.snap.xml");
-
-// File → XML → snapshot → workflow
-var loaded = SnapshotManager.LoadSnapshot(serializer, "test.snap.xml");
-var restored = SnapshotManager.RestoreWorkflow(loaded);
-
-Console.WriteLine($"Restored: {restored.Description}");
-Console.WriteLine($"Rules: {restored.Rules.Count}");
-```
-
-### Example 4: Version Checking Before Execution
-
-```csharp
-var expectedVersion = new RuleVersion(2, 0, 0);
-
-var snapshot = SnapshotManager.LoadSnapshot(serializer, "rules.snap.json");
+// 2. Restore the workflow
 var workflow = SnapshotManager.RestoreWorkflow(snapshot);
 
-if (!workflow.IsVersionCompatibleWith(expectedVersion))
+// 3. Execute (AOT-safe!)
+var parameters = new[]
 {
-    Console.WriteLine($"Version mismatch: expected {expectedVersion}, got {workflow.Version}");
-    return;
-}
+    new RuleParameter("order", typeof(Order), order),
+    new RuleParameter("customer", typeof(Customer), customer)
+};
 
 var results = workflow.Execute(parameters);
 ```
 
----
+### Key Points for AOT Stage
 
-## Version Compatibility
+- ✅ Can load snapshots — no reflection or compilation needed
+- ✅ Can execute pre-compiled rules
+- ✅ Works with `PublishAot=true`
+- ❌ Cannot call `Compile()` — will throw `AotCompatibilityException`
 
-Snapshots include rule versions. Loading a snapshot does not validate version compatibility:
+## Runtime Detection
+
+Check if you're running in AOT mode:
 
 ```csharp
-var snapshot = SnapshotManager.LoadSnapshot(serializer, "workflow.snap.json");
-var workflow = SnapshotManager.RestoreWorkflow(snapshot);
+if (AotCompatibility.IsAot)
+{
+    Console.WriteLine("Running in AOT mode — use snapshots");
+}
+else
+{
+    Console.WriteLine("Running in JIT mode — can compile rules");
+}
+```
 
-if (!workflow.IsVersionCompatibleWith(expectedVersion))
+## Common Patterns
+
+### Pattern 1: Build-Time Snapshot Generation
+
+```csharp
+// In a console app that runs during CI/CD
+public static void Main(string[] args)
+{
+    AotCompatibility.ThrowIfAot(nameof(Main)); // Must run in JIT
+
+    foreach (var ruleFile in Directory.GetFiles("rules", "*.json"))
+    {
+        var workflow = JsonRuleLoader.LoadWorkflowFromFile(ruleFile);
+        var parameters = GetParametersFor(ruleFile);
+
+        workflow.Compile(parameters);
+        var snapshot = SnapshotManager.CreateSnapshot(
+            CompiledWorkflow.Compile(workflow, parameters));
+
+        var outputPath = Path.Combine("snapshots", Path.GetFileName(ruleFile) + ".snapshot");
+        SnapshotManager.SaveSnapshot(snapshot, new JsonSnapshotSerializer(), outputPath);
+    }
+}
+```
+
+### Pattern 2: Snapshot Cache
+
+```csharp
+public class SnapshotCache
+{
+    private readonly Dictionary<string, WorkflowSnapshot> _cache = new();
+
+    public WorkflowSnapshot GetOrLoad(string name, ISnapshotSerializer serializer)
+    {
+        if (!_cache.TryGetValue(name, out var snapshot))
+        {
+            snapshot = SnapshotManager.LoadSnapshot(serializer, $"snapshots/{name}.json");
+            _cache[name] = snapshot;
+        }
+        return snapshot;
+    }
+}
+```
+
+### Pattern 3: Fallback to JIT in Development
+
+```csharp
+public class RuleEngineFactory
+{
+    public IRuleEngine Create(string workflowName)
+    {
+        if (AotCompatibility.IsAot)
+        {
+            // Production: Load from snapshot
+            var snapshot = _snapshotCache.Get(workflowName);
+            return SnapshotManager.RestoreWorkflow(snapshot);
+        }
+        else
+        {
+            // Development: Load from JSON, compile
+            var workflow = JsonRuleLoader.LoadWorkflowFromFile($"rules/{workflowName}.json");
+            workflow.Compile(_parameters);
+            return workflow;
+        }
+    }
+}
+```
+
+## Troubleshooting
+
+### "JIT compilation is not available in AOT mode"
+
+**Error:** `AotCompatibilityException: Compile is not supported in AOT mode`
+
+**Solution:** You're calling `Compile()` in an AOT environment. Use pre-generated snapshots instead.
+
+### "Failed to deserialize workflow from JSON"
+
+**Error:** JSON parsing error when loading snapshots
+
+**Solution:** Ensure you're using the same serializer version for save and load. Consider versioning your snapshot files:
+
+```csharp
+// Save with version
+var snapshot = new WorkflowSnapshot
+{
+    Version = new RuleVersion(1, 0, 0),
+    // ...
+};
+
+// Check version on load
+if (!snapshot.Version.IsCompatibleWith(expectedVersion))
 {
     throw new InvalidOperationException("Snapshot version mismatch");
 }
 ```
+
+### "Snapshot doesn't include compiled delegates"
+
+**Behavior:** Rules execute slowly or throw compilation errors
+
+**Solution:** Snapshots contain rule definitions, not compiled IL. You must still call `Compile()` in JIT environments before creating snapshots. In AOT, the rules were already compiled before snapshotting.
+
+## Migration from JIT to AOT
+
+1. **Identify** rules that need to be pre-compiled
+2. **Create** a snapshot generation tool (console app)
+3. **Run** the tool in your CI/CD pipeline
+4. **Package** snapshots with your AOT app
+5. **Update** your app to load snapshots instead of compiling
+
+## See Also
+
+- [AOT Compatibility](./aot-compatibility.md) — Detailed AOT detection and troubleshooting
+- [Performance Tuning](./performance-tuning.md) — Optimize rule execution
+- [API Reference: SnapshotManager](../api/snapshotmanager.md)
+- [API Reference: ISnapshotSerializer](../api/isnapshotserializer.md)
