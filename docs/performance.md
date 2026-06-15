@@ -1,10 +1,11 @@
 ---
 layout: default
 title: Performance
-nav_order: 6
+parent: Documentation
+nav_order: 5
 ---
 
-[← Back to Documentation Index](index.md)
+[<- Back to Documentation Index](index.md)
 
 # Performance
 
@@ -36,23 +37,11 @@ var result = delegate.DynamicInvoke(args);  // Boxing + reflection
 var result = _delegate(customer);  // Direct call, zero overhead
 ```
 
-### 3. Single Parameter
-
-One input = no array allocation per call. Wrap multiples in structs:
-
-```csharp
-// Fast
-Func<Customer, bool>
-
-// Slower (array allocation)
-Func<Customer, int, bool>
-```
-
-### 4. Immutable Rules
+### 3. Immutable Rules
 
 Properties locked after `Compile()`. Zero locks, zero contention.
 
-### 5. Parallel.For
+### 4. Parallel.For
 
 Independent rules run on thread pool. No manual Task creation.
 
@@ -65,6 +54,8 @@ Independent rules run on thread pool. No manual Task creation.
 | Rules hit database/HTTP | Use `ExecuteParallelAsync()` |
 | One-time setup | Call `Validate()` + `Compile()` at startup |
 | Hot path | Reuse compiled workflow, never recompile |
+| Rapidly changing rules | Lower `maxCompilesBeforeRecycle` |
+| Stable production rules | Raise `maxCompilesBeforeRecycle` |
 
 ## Memory
 
@@ -73,3 +64,23 @@ Independent rules run on thread pool. No manual Task creation.
 - RuleResult: ~32 bytes per execution
 
 Typical 100-rule workflow: ~50KB compiled, executes in microseconds.
+
+## Multi-Parameter Delegates
+
+RoslynRules supports up to 16 parameters directly. Single-parameter delegates use direct invocation (fastest). Multi-parameter delegates use `DynamicInvoke` with an object array (slightly slower).
+
+For maximum performance with multiple inputs, wrap them in a struct:
+
+```csharp
+// Fastest: single parameter
+public record CustomerInput(int Age, bool IsActive, string Name);
+var rule = new Rule { Expression = "input.Age >= 18 && input.IsActive" };
+
+// Convenient: multi-parameter (slightly slower)
+var rule = new Rule { Expression = "age >= 18 && isActive" };
+```
+
+## See Also
+
+- [Performance Tuning](performance-tuning.md) — Detailed tuning guide
+- [Benchmarks](https://github.com/asulwer/RoslynRules/tree/main/RoslynRules.Benchmarks) — BenchmarkDotNet project

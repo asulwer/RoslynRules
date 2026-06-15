@@ -1,5 +1,5 @@
 using FluentAssertions;
-using RoslynRules.Extensions;
+using RoslynRules.Json;
 using RoslynRules.Models;
 using System;
 using System.IO;
@@ -45,7 +45,7 @@ namespace RoslynRules.Tests.Integration
             };
 
             var json = JsonRuleLoader.Serialize(original);
-            var restored = JsonRuleLoader.Deserialize(json);
+            var restored = JsonRuleLoader.DeserializeWorkflow(json);
 
             restored.Description.Should().Be(original.Description);
             restored.IsActive.Should().BeTrue();
@@ -88,7 +88,7 @@ namespace RoslynRules.Tests.Integration
             };
 
             var json = JsonRuleLoader.Serialize(original);
-            var restored = JsonRuleLoader.Deserialize(json);
+            var restored = JsonRuleLoader.DeserializeWorkflow(json);
 
             restored.Rules.Should().HaveCount(1);
             var parent = restored.Rules[0];
@@ -106,18 +106,15 @@ namespace RoslynRules.Tests.Integration
             {
                 Rules = new List<Rule>
                 {
-                    new Rule
+                    new Rule(ruleId)
                     {
                         Description = "Rule with ID"
                     }
                 }
             };
 
-            // Set a known ID
-            typeof(Rule).GetProperty("Id")?.SetValue(original.Rules[0], ruleId);
-
             var json = JsonRuleLoader.Serialize(original);
-            var restored = JsonRuleLoader.Deserialize(json);
+            var restored = JsonRuleLoader.DeserializeWorkflow(json);
 
             restored.Rules[0].Id.Should().Be(ruleId);
         }
@@ -139,10 +136,10 @@ namespace RoslynRules.Tests.Integration
                 }
             };
 
-            JsonRuleLoader.SaveToFile(original, _tempFile);
+            JsonRuleLoader.SaveWorkflowToFile(original, _tempFile);
             File.Exists(_tempFile).Should().BeTrue();
 
-            var restored = JsonRuleLoader.LoadFromFile(_tempFile);
+            var restored = JsonRuleLoader.LoadWorkflowFromFile(_tempFile);
             restored.Description.Should().Be("File test");
             restored.Rules[0].Expression.Should().Be("1 == 1");
             restored.Rules[0].Action.Should().Be("customer.Processed = true");
@@ -169,7 +166,7 @@ namespace RoslynRules.Tests.Integration
             };
 
             var json = JsonRuleLoader.Serialize(original);
-            var restored = JsonRuleLoader.Deserialize(json);
+            var restored = JsonRuleLoader.DeserializeWorkflow(json);
 
             restored.Rules.Should().HaveCount(2);
             restored.Rules[0].IsActive.Should().BeTrue();
@@ -179,7 +176,7 @@ namespace RoslynRules.Tests.Integration
         [Fact]
         public void Deserialize_InvalidJson_ThrowsJsonException()
         {
-            var act = () => JsonRuleLoader.Deserialize("not valid json");
+            var act = () => JsonRuleLoader.DeserializeWorkflow("not valid json");
             act.Should().Throw<System.Text.Json.JsonException>();
         }
 
@@ -192,7 +189,7 @@ namespace RoslynRules.Tests.Integration
             };
 
             var json = JsonRuleLoader.Serialize(original);
-            var restored = JsonRuleLoader.Deserialize(json);
+            var restored = JsonRuleLoader.DeserializeWorkflow(json);
 
             restored.Description.Should().Be("Empty");
             restored.Rules.Should().BeEmpty();
@@ -212,7 +209,7 @@ namespace RoslynRules.Tests.Integration
             };
 
             var json = JsonRuleLoader.Serialize(original);
-            var restored = JsonRuleLoader.Deserialize(json);
+            var restored = JsonRuleLoader.DeserializeWorkflow(json);
 
             restored.Rules.Should().HaveCount(3);
             restored.Rules.Select(r => r.Description).Should().Equal("Rule 1", "Rule 2", "Rule 3");
@@ -244,7 +241,7 @@ namespace RoslynRules.Tests.Integration
                 ]
             }";
 
-            var restored = JsonRuleLoader.Deserialize(json);
+            var restored = JsonRuleLoader.DeserializeWorkflow(json);
 
             restored.Rules[0].Description.Should().Be("Level 1 Parent");
             restored.Rules[0].ChildRules[0].Description.Should().Be("Level 2 Child");

@@ -18,6 +18,7 @@ namespace RoslynRules.Tests.Execution
     {
         private readonly RuleParameter[] _parameters;
         private readonly string[] _namespaces;
+        private readonly ExpressionCompiler _compiler;
 
         public AsyncAndLoggingTests()
         {
@@ -26,17 +27,8 @@ namespace RoslynRules.Tests.Execution
                 new RuleParameter("customer", typeof(TestCustomer), new TestCustomer { Age = 25, Name = "Alice" })
             };
             _namespaces = new[] { "RoslynRules.Tests", "System", "System.Threading.Tasks" };
+            _compiler = TestCompiler.Instance;
         }
-
-        
-
-        
-
-        
-
-        
-
-        
 
         [Fact]
         public async Task ExecuteAsync_AsyncExpression_ReturnsTrue()
@@ -48,8 +40,7 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+            rule.Compile(_compiler, _parameters, _namespaces);
 
             var result = await rule.ExecuteAsync(_parameters);
 
@@ -66,8 +57,7 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+            rule.Compile(_compiler, _parameters, _namespaces);
 
             var result = await rule.ExecuteAsync(_parameters);
 
@@ -85,8 +75,7 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+            rule.Compile(_compiler, _parameters, _namespaces);
 
             var result = await rule.ExecuteAsync(_parameters);
 
@@ -114,8 +103,7 @@ namespace RoslynRules.Tests.Execution
 
             parent.ChildRules.Add(child);
 
-            var compiler = new ExpressionCompiler();
-            parent.Compile(compiler, _parameters, _namespaces);
+            parent.Compile(_compiler, _parameters, _namespaces);
 
             var result = await parent.ExecuteAsync(_parameters);
 
@@ -134,8 +122,7 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+            rule.Compile(_compiler, _parameters, _namespaces);
 
             var result = await rule.ExecuteAsync(_parameters);
 
@@ -155,8 +142,7 @@ namespace RoslynRules.Tests.Execution
                 Logger = logger
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+            rule.Compile(_compiler, _parameters, _namespaces);
             rule.Execute(_parameters);
 
             logger.LogMessages.Should().ContainSingle();
@@ -176,8 +162,7 @@ namespace RoslynRules.Tests.Execution
                 Logger = logger
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+            rule.Compile(_compiler, _parameters, _namespaces);
             rule.Execute(_parameters);
 
             logger.LogMessages.Should().ContainSingle();
@@ -197,8 +182,7 @@ namespace RoslynRules.Tests.Execution
                 Logger = logger
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+            rule.Compile(_compiler, _parameters, _namespaces);
             rule.Execute(_parameters);
 
             logger.LogMessages.Should().ContainSingle();
@@ -210,11 +194,9 @@ namespace RoslynRules.Tests.Execution
         public void Validate_DuplicateRuleIds_ThrowsDuplicateRuleIdException()
         {
             var workflow = new global::RoslynRules.Models.Workflow();
-            var rule1 = new Rule { Description = "Rule 1", Expression = "true" };
-            var rule2 = new Rule { Description = "Rule 2", Expression = "true" };
-            
-            // Force same ID
-            typeof(Rule).GetProperty("Id")?.SetValue(rule2, rule1.Id);
+            var sharedId = Guid.NewGuid();
+            var rule1 = new Rule(sharedId) { Description = "Rule 1", Expression = "true" };
+            var rule2 = new Rule(sharedId) { Description = "Rule 2", Expression = "true" };
             
             workflow.Rules.Add(rule1);
             workflow.Rules.Add(rule2);
@@ -257,4 +239,3 @@ namespace RoslynRules.Tests.Execution
         }
     }
 }
-

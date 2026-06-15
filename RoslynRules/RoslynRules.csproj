@@ -8,13 +8,13 @@
     <RootNamespace>RoslynRules</RootNamespace>
     <PackageId>RoslynRules</PackageId>
     <Authors>Aaron Sulwer</Authors>
-    <Description>High-performance .NET rules engine with Roslyn compilation, typed delegates, and async support</Description>
-    <PackageTags>rules;engine;roslyn;validation;workflow;business-logic</PackageTags>
+    <Description>High-performance .NET rules engine with Roslyn compilation, typed delegates, async support, AOT compatibility, and rule versioning</Description>
+    <PackageTags>rules;engine;roslyn;validation;workflow;business-logic;aot;trimming;versioning</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/asulwer/RoslynRules</RepositoryUrl>
     <PackageProjectUrl>https://github.com/asulwer/RoslynRules</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors />
     <AnalysisLevel>latest</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
@@ -22,6 +22,28 @@
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+    <!-- Enable trim annotations for AOT/trimming compatibility -->
+    <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    
+    <!-- 
+      RoslynRules uses reflection for compilation which is inherently not trim-safe.
+      The library is annotated with RequiresUnreferencedCodeAttribute where needed.
+      These suppressions prevent false-positive trim warnings for known reflection usage.
+    -->
+    <NoWarn>$(NoWarn);IL2026;IL2057;IL2090</NoWarn>
+  </PropertyGroup>
+  
+  <PropertyGroup>
+    <VersionPrefix>1.0</VersionPrefix>
+    <BuildDate>$([System.DateTime]::Now.ToString('yyMMdd'))</BuildDate>
+    <BuildTime>$([System.DateTime]::Now.ToString('HHmm'))</BuildTime>
+    <Version>$(VersionPrefix).$(BuildDate).$(BuildTime)</Version>
+    <PackageVersion>$(VersionPrefix).$(BuildDate).$(BuildTime)</PackageVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -37,10 +59,10 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="all" />
     <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
-    <PackageReference Include="System.Text.Json" Version="10.0.8" />
+    <PackageReference Include="System.Text.Json" Version="10.0.9" />
   </ItemGroup>
 
 </Project>

@@ -76,10 +76,11 @@ namespace RoslynRules.Tests.Compiler
         }
 
         [Fact]
-        public void CompiledDelegateFactory_Wrap_MultiParameter_Throws()
+        public void CompiledDelegateFactory_Wrap_MultiParameter_ReturnsCompiledMultiParamDelegate()
         {
             Func<object, object, bool> func = (a, b) => true;
-            Assert.Throws<NotSupportedException>(() => CompiledDelegateFactory.Wrap(func));
+            var result = CompiledDelegateFactory.Wrap(func);
+            Assert.IsType<CompiledMultiParamDelegate>(result);
         }
     }
 }

@@ -1,6 +1,6 @@
 using FluentAssertions;
-using Microsoft.CSharp.RuntimeBinder;
 using RoslynRules.Compiler;
+using Microsoft.CSharp.RuntimeBinder;
 using RoslynRules.Models;
 using System.Dynamic;
 using Xunit;
@@ -17,8 +17,11 @@ namespace RoslynRules.Tests.Execution
     {
         private readonly string[] _namespaces;
 
+        private readonly ExpressionCompiler _compiler;
+
         public ExpandoObjectTests()
         {
+            _compiler = TestCompiler.Instance;
             _namespaces = new[] { "System.Dynamic", "Microsoft.CSharp.RuntimeBinder" };
         }
 
@@ -41,8 +44,7 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, parameters, _namespaces);
+                        rule.Compile(_compiler, parameters, _namespaces);
 
             var result = rule.Execute(parameters);
 
@@ -67,8 +69,7 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, parameters, _namespaces);
+                        rule.Compile(_compiler, parameters, _namespaces);
 
             var result = rule.Execute(parameters);
 
@@ -94,8 +95,7 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, parameters, _namespaces);
+                        rule.Compile(_compiler, parameters, _namespaces);
 
             var result = rule.Execute(parameters);
 
@@ -121,8 +121,7 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, parameters, _namespaces);
+                        rule.Compile(_compiler, parameters, _namespaces);
 
             // Missing property returns null, so comparison returns false
             var result = rule.Execute(parameters);
@@ -149,8 +148,7 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, parameters, _namespaces);
+                        rule.Compile(_compiler, parameters, _namespaces);
 
             var result = rule.Execute(parameters);
 
@@ -227,8 +225,7 @@ namespace RoslynRules.Tests.Execution
 
             parent.ChildRules.Add(child);
 
-            var compiler = new ExpressionCompiler();
-            parent.Compile(compiler, parameters, _namespaces);
+                        parent.Compile(_compiler, parameters, _namespaces);
 
             var result = parent.Execute(parameters);
 
@@ -236,3 +233,6 @@ namespace RoslynRules.Tests.Execution
         }
     }
 }
+
+
+

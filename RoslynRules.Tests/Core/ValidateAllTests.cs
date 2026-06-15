@@ -1,5 +1,8 @@
+using FluentAssertions;
 using RoslynRules.Batch;
+using RoslynRules.Exceptions;
 using RoslynRules.Models;
+using System;
 using System.Linq;
 using Xunit;
 using Workflow = global::RoslynRules.Models.Workflow;
@@ -47,13 +50,13 @@ namespace RoslynRules.Tests.Core
         public void Workflow_ValidateAll_MultipleErrors_ReturnsAll()
         {
             var wf = new global::RoslynRules.Models.Workflow();
-            var rule1 = new Rule { Expression = "true" };
-            var rule2 = new Rule { Expression = "true" }; // Will have duplicate ID
+            var sharedId = Guid.NewGuid();
+            var rule1 = new Rule(sharedId) { Expression = "true" };
+            var rule2 = new Rule(sharedId) { Expression = "true" }; // Duplicate ID
             var rule3 = new Rule { Expression = "broken syntax @#$" };
             wf.Rules.Add(rule1);
             wf.Rules.Add(rule2);
             wf.Rules.Add(rule3);
-            typeof(Rule).GetProperty("Id")!.SetValue(rule2, rule1.Id);
 
             var errors = wf.ValidateAll();
 
@@ -97,16 +100,77 @@ namespace RoslynRules.Tests.Core
             Assert.Equal(ValidationErrorType.NoActiveRules, errors[0].ErrorType);
         }
 
+        // ==================== STATIC VALIDATE SEMANTICS OVERLOADS ====================
+
+        [Fact]
+        public void Rule_ValidateSemantics_Static_WithType_ValidExpression_Succeeds()
+        {
+            // Should not throw
+            Rule.ValidateSemantics("param > 0", typeof(int));
+        }
+
+        [Fact]
+        public void Rule_ValidateSemantics_Static_WithType_InvalidExpression_Throws()
+        {
+            var ex = Assert.Throws<RuleCompilationException>(() =>
+                Rule.ValidateSemantics("param.NonExistentMethod()", typeof(int)));
+            Assert.Contains("Semantic error", ex.Message);
+        }
+
+        [Fact]
+        public void Rule_ValidateSemantics_Static_WithTypeName_Alias_ValidExpression_Succeeds()
+        {
+            // Should not throw
+            Rule.ValidateSemantics("param.Length > 0", "string");
+        }
+
+        [Fact]
+        public void Rule_ValidateSemantics_Static_WithTypeName_FullName_ValidExpression_Succeeds()
+        {
+            // Should not throw
+            Rule.ValidateSemantics("param.Year > 2000", "System.DateTime");
+        }
+
+        [Fact]
+        public void Rule_ValidateSemantics_Static_WithTypeName_InvalidTypeName_ThrowsArgumentException()
+        {
+            var ex = Assert.Throws<ArgumentException>(() =>
+                Rule.ValidateSemantics("param > 0", "NonExistent.Type"));
+            Assert.Contains("Could not resolve type", ex.Message);
+        }
+
+        [Fact]
+        public void Rule_ValidateSemantics_Static_WithTypeName_CustomParameterName_Succeeds()
+        {
+            // Should not throw — uses custom parameter name with matching type
+            Rule.ValidateSemantics("customer > 0", "int", "customer");
+        }
+
+        [Fact]
+        public void Rule_ValidateSemantics_Static_NullExpression_ThrowsArgumentException()
+        {
+            var ex = Assert.Throws<ArgumentException>(() =>
+                Rule.ValidateSemantics(null!, typeof(int)));
+            Assert.Contains("Expression cannot be null", ex.Message);
+        }
+
+        [Fact]
+        public void Rule_ValidateSemantics_Static_EmptyExpression_ThrowsArgumentException()
+        {
+            var ex = Assert.Throws<ArgumentException>(() =>
+                Rule.ValidateSemantics("   ", typeof(int)));
+            Assert.Contains("Expression cannot be null", ex.Message);
+        }
+
         [Fact]
         public void RuleBatch_ValidateAll_DuplicateIds_ReturnsDuplicateRuleIdError()
         {
             var batch = new RuleBatch();
-            var rule1 = new Rule { Expression = "true" };
-            var rule2 = new Rule { Expression = "false" };
+            var sharedId = Guid.NewGuid();
+            var rule1 = new Rule(sharedId) { Expression = "true" };
+            var rule2 = new Rule(sharedId) { Expression = "false" };
             batch.AddRule(rule1);
             batch.AddRule(rule2);
-            // Force duplicate Id
-            typeof(Rule).GetProperty("Id")!.SetValue(rule2, rule1.Id);
 
             var errors = batch.ValidateAll();
 

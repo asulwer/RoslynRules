@@ -103,7 +103,7 @@ var dbRules = await dbContext.Rules.Where(r => r.IsActive).ToListAsync();
 batch.AddRules(dbRules);
 
 // Add from JSON
-var jsonRules = JsonRuleLoader.LoadFromFile("rules.json");
+var jsonRules = JsonRuleLoader.LoadWorkflowFromFile("rules.json");
 batch.AddRules(jsonRules.Rules);
 
 // Single compile

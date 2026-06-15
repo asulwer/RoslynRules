@@ -59,13 +59,44 @@ var workflow = new Workflow
 
 ### 4. Define Parameters
 
+For **compilation**, only the parameter **type** and **name** are needed.
+
+```csharp
+var compileParams = new[]
+{
+    RuleParameter.ForCompile("customer", typeof(Customer))
+};
+```
+
+For **execution**, pass a parameter with a real value:
+
 ```csharp
 var customer = new Customer { Name = "Alice", Age = 25 };
 
-var parameters = new RuleParameter[]
+var executeParams = new[]
 {
-    new RuleParameter("customer", typeof(Customer), customer)
+    RuleParameter.ForExecute("customer", typeof(Customer), customer)
 };
+```
+
+### Multiple Parameters
+
+Rules can accept multiple parameters directly — up to 16.
+
+```csharp
+var rule = new Rule
+{
+    Description = "Price validation",
+    Expression = "price > 0 && quantity > 0"
+};
+
+var parameters = new[]
+{
+    RuleParameter.ForCompile("price", typeof(decimal)),
+    RuleParameter.ForCompile("quantity", typeof(int))
+};
+
+rule.Compile(compiler, parameters);
 ```
 
 ### 5. Validate, Compile, Execute
@@ -74,17 +105,19 @@ var parameters = new RuleParameter[]
 // Catch errors before compiling
 workflow.Validate();
 
-// Compile once
-workflow.Compile(parameters);
+// Compile once — types and names only
+workflow.Compile(compileParams);
 
-// Execute many times
-var results = workflow.Execute(parameters);
+// Execute many times with different values
+var results = workflow.Execute(executeParams);
 
 foreach (var result in results)
 {
     Console.WriteLine($"Success: {result.Success}");
 }
 ```
+
+**Key point:** Compile with `ForCompile()` (types only). Execute with `ForExecute()` (real values). Separate compilation from execution.
 
 ## Next Steps
 

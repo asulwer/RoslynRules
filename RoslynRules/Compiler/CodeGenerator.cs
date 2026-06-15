@@ -35,13 +35,36 @@ namespace RoslynRules.Compiler
             Type[] parameterTypes,
             string[]? additionalNamespaces = null)
         {
-            var isAsync = expression.Contains("await ");
-            var methodSignature = BuildMethodSignature(returnType, parameterNames, parameterTypes, isAsync);
+            var isAsync = ContainsAwaitExpression(expression);
+            
+            // Unwrap Task/Task<T> to get the logical return type for the method signature
+            var logicalReturnType = returnType;
+            if (returnType == typeof(Task))
+            {
+                logicalReturnType = typeof(void);
+            }
+            else if (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(Task<>))
+            {
+                logicalReturnType = returnType.GetGenericArguments()[0];
+            }
+            
+            var methodSignature = BuildMethodSignature(logicalReturnType, parameterNames, parameterTypes, isAsync);
             
             // For async methods: if expression starts with 'await', don't double-await
-            var returnKeyword = isAsync 
-                ? (expression.TrimStart().StartsWith("await ") ? "return " : "return await ")
-                : (returnType == typeof(void) ? "" : "return ");
+            // For void return types (sync or async), don't add 'return'
+            string returnKeyword;
+            if (logicalReturnType == typeof(void))
+            {
+                returnKeyword = "";
+            }
+            else if (isAsync)
+            {
+                returnKeyword = expression.TrimStart().StartsWith("await ") ? "return " : "return await ";
+            }
+            else
+            {
+                returnKeyword = "return ";
+            }
             var usingStatements = BuildUsingStatements(additionalNamespaces, isAsync);
 
             var code = $@"
@@ -114,6 +137,28 @@ public static class ExpressionAssembly
             }
 
             return string.Join("\n", allUsings.Select(u => $"using {u};"));
+        }
+
+        /// <summary>
+        /// Checks if an expression contains an actual await expression by parsing the syntax tree.
+        /// Avoids false positives from variable names, string literals, or comments.
+        /// </summary>
+        private static bool ContainsAwaitExpression(string expression)
+        {
+            if (string.IsNullOrWhiteSpace(expression))
+                return false;
+
+            try
+            {
+                var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(expression);
+                var root = tree.GetRoot();
+                return root.DescendantNodes().Any(n => n is Microsoft.CodeAnalysis.CSharp.Syntax.AwaitExpressionSyntax);
+            }
+            catch
+            {
+                // If parsing fails, fall back to the simple but fragile check
+                return expression.Contains("await");
+            }
         }
     }
 }

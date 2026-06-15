@@ -15,9 +15,11 @@ Quick-reference code snippets for common scenarios.
 - [Basic Boolean Rule](#basic-boolean-rule)
 - [Rule with Action](#rule-with-action)
 - [Parent with Child Rules](#parent-with-child-rules)
+- [Multiple Parameters](#multiple-parameters)
 - [Async Rule](#async-rule)
 - [Returning Multiple Values](#returning-multiple-values)
 - [Workflow with Multiple Rules](#workflow-with-multiple-rules)
+- [Dependency Chaining](#dependency-chaining)
 - [Logging with Serilog](#logging-with-serilog)
 - [ExpandoObject](#expandoobject-dynamic)
 - [JSON Configuration](#json-configuration)
@@ -26,6 +28,7 @@ Quick-reference code snippets for common scenarios.
 - [Rule Priority](#rule-priority)
 - [Per-Rule Timeout](#per-rule-timeout)
 - [Validation Before Compile](#validation-before-compile)
+- [Semantic Validation (No Rule Instance)](#semantic-validation-no-rule-instance)
 - [Non-Throwing Validation](#non-throwing-validation)
 
 ## Detailed Guides
@@ -38,17 +41,10 @@ Quick-reference code snippets for common scenarios.
 | [Real-World Use Cases](real-world-use-cases.md) | Form validation, fraud detection, feature flags, compliance, pricing |
 | [EF Core Serialization](ef-serialization.md) | DbContext setup, storing/loading rules, temporal tables |
 | [When to Use What](when-to-use-what.md) | Decision matrix, execution modes, choosing by rule count |
+| [Localization](localization.md) | i18n with DescriptionKey and IRuleDescriptionProvider |
+| [Visualization](visualization.md) | DOT/Mermaid dependency graphs |
 
 ## Basic Boolean Rule
-
-```csharp
-var rule = new Rule
-{
-    Description = "Adult check",
-    Expression = "customer.Age >= 18",
-    IsActive = true
-};
-```
 
 ```csharp
 var rule = new Rule
@@ -96,6 +92,49 @@ var child2 = new Rule
 
 parent.ChildRules.Add(child1);
 parent.ChildRules.Add(child2);
+```
+
+## Multiple Parameters
+
+Pass multiple parameters directly — up to 16.
+
+```csharp
+var rule = new Rule
+{
+    Description = "Price check",
+    Expression = "price > 0 && quantity > 0",
+    IsActive = true
+};
+
+var parameters = new[]
+{
+    new RuleParameter("price", typeof(decimal), 9.99m),
+    new RuleParameter("quantity", typeof(int), 5)
+};
+
+var compiler = new ExpressionCompiler();
+rule.Compile(compiler, parameters);
+
+var result = rule.Execute(parameters);
+// result.Success = true
+```
+
+**Parameter names in expressions** match exactly:
+
+```csharp
+var rule = new Rule
+{
+    Expression = "x > y"
+};
+
+var parameters = new[]
+{
+    new RuleParameter("x", typeof(int), 10),
+    new RuleParameter("y", typeof(int), 5)
+};
+
+rule.Compile(compiler, parameters);
+rule.Execute(parameters); // Success = true
 ```
 
 ## Async Rule
@@ -162,6 +201,56 @@ workflow.Compile(parameters);
 // All rules evaluated, results in order
 var results = workflow.ExecuteParallel(parameters);
 ```
+
+## Dependency Chaining
+
+Chain rules with `DependsOnRuleId` so downstream rules access upstream results via `RuleContext`.
+
+```csharp
+var authId = Guid.NewGuid();
+var authRule = new Rule(authId)
+{
+    Description = "Authenticated?",
+    Expression = "user.IsAuthenticated",
+    IsActive = true
+};
+
+var adminId = Guid.NewGuid();
+var adminRule = new Rule(adminId)
+{
+    Description = "Admin?",
+    Expression = "context.GetValue<bool>(authId) && user.Role == \"Admin\"",
+    DependsOnRuleId = authId,
+    IsActive = true
+};
+
+var discountId = Guid.NewGuid();
+var discountRule = new Rule(discountId)
+{
+    Description = "VIP discount",
+    Expression = "context.GetValue<bool>(adminId) && user.IsVip",
+    DependsOnRuleId = adminId,
+    IsActive = true
+};
+
+var workflow = new Workflow();
+workflow.Rules.Add(authRule);
+workflow.Rules.Add(adminRule);
+workflow.Rules.Add(discountRule);
+
+workflow.Compile(new[] { new RuleParameter("user", typeof(User)) });
+
+// Auth → Admin → Discount (dependency order)
+var results = workflow.Execute(new[]
+{
+    new RuleParameter("user", typeof(User), currentUser)
+});
+```
+
+**Key points:**
+- `DependsOnRuleId` ensures execution order
+- `RuleContext.GetValue<T>(ruleId)` retrieves upstream results
+- Cyclic dependencies throw `CircularReferenceException` on `Validate()`
 
 ## Logging with Serilog
 
@@ -231,7 +320,7 @@ Store rules in JSON files for configuration-driven setups:
 using RoslynRules.Extensions;
 
 // Load from JSON
-var workflow = JsonRuleLoader.LoadFromFile("customer-rules.json");
+var workflow = JsonRuleLoader.LoadWorkflowFromFile("customer-rules.json");
 
 // Validate, compile, execute as normal
 workflow.Validate();
@@ -414,6 +503,25 @@ catch (InvalidOperationException ex)
     Console.WriteLine($"Validation failed: {ex.Message}");
 }
 ```
+
+## Semantic Validation (No Rule Instance)
+
+Validate an expression string without creating a Rule — useful for validating user input or API parameters before storing them.
+
+```csharp
+// Using a Type
+Rule.ValidateSemantics("param > 0", typeof(int));
+
+// Using a type alias
+Rule.ValidateSemantics("name.Length > 0", "string", "name");
+
+// Using full type name
+Rule.ValidateSemantics("date.Year >= 2000", "System.DateTime", "date");
+```
+
+**Supported aliases:** `bool`, `byte`, `char`, `decimal`, `double`, `float`, `int`, `long`, `short`, `string`, `object`, and any full type name (e.g., `System.DateTime`).
+
+**Throws `RuleCompilationException`** if the expression has undefined variables, missing types, or incorrect method signatures.
 
 ## Non-Throwing Validation
 

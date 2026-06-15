@@ -31,7 +31,8 @@ namespace RoslynRules.Abstractions
         /// </summary>
         /// <param name="parameters">Input parameter definitions (name + type).</param>
         /// <param name="additionalNamespaces">Optional extra namespaces for compilation.</param>
-        void Compile(RuleParameter[] parameters, string[]? additionalNamespaces = null);
+        /// <param name="referenceProvider">Optional custom assembly reference provider for sandboxing.</param>
+        void Compile(RuleParameter[] parameters, string[]? additionalNamespaces = null, Compiler.AssemblyReferenceProvider? referenceProvider = null);
 
         /// <summary>
         /// Executes all rules sequentially against the provided input values.

@@ -28,7 +28,7 @@ dotnet test
 
 1. Update the README.md or docs/ if your change affects public API or behavior
 2. Update or add tests for any new functionality
-3. Ensure the build passes with no warnings (`dotnet build --warnaserror`)
+3. Ensure the build passes (`dotnet build`) — warnings are treated as errors by default
 4. Link any related issues in your PR description
 5. Request review from maintainers
 

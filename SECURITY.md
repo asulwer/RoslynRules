@@ -18,9 +18,9 @@ Please do not open public issues for security vulnerabilities.
 
 **RoslynRules compiles user-supplied C# expression strings into executable code at runtime.** This is a powerful feature, but it carries inherent security risks similar to SQL injection or eval-based attacks.
 
-### Built-in Sandboxing (v2.0+)
+### Built-in Sandboxing (v1.0.3+)
 
-Starting with v2.0, RoslynRules ships with a **default assembly whitelist** that restricts what compiled expressions can access. The compiler only references assemblies matching the whitelist and explicitly excludes known dangerous assemblies.
+Starting with v1.0.3, RoslynRules ships with a **default assembly whitelist** that restricts what compiled expressions can access. The compiler only references assemblies matching the whitelist and explicitly excludes known dangerous assemblies.
 
 **Default whitelisted assemblies:**
 - `System.Runtime`, `System.Private.CoreLib` — core .NET types

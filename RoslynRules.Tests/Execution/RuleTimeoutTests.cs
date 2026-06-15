@@ -105,11 +105,10 @@ namespace RoslynRules.Tests.Execution
         }
 
         [Fact]
-        public void RuleTimeoutException_InheritsFromRuleExecutionException()
+        public void RuleTimeoutException_InheritsFromRulesException()
         {
             var ex = new RuleTimeoutException(Guid.NewGuid(), TimeSpan.FromSeconds(1));
 
-            Assert.IsAssignableFrom<RuleExecutionException>(ex);
             Assert.IsAssignableFrom<RulesException>(ex);
         }
 

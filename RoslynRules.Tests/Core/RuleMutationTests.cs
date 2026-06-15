@@ -14,8 +14,11 @@ namespace RoslynRules.Tests.Core
         private readonly RuleParameter[] _parameters;
         private readonly string[] _namespaces;
 
+        private readonly ExpressionCompiler _compiler;
+
         public RuleMutationTests()
         {
+            _compiler = TestCompiler.Instance;
             _parameters = new[]
             {
                 new RuleParameter("customer", typeof(TestCustomer), new TestCustomer { Age = 25 })
@@ -33,8 +36,7 @@ namespace RoslynRules.Tests.Core
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+                        rule.Compile(_compiler, _parameters, _namespaces);
 
             var act = () => rule.IsActive = false;
             act.Should().Throw<RuleCompilationException>();
@@ -51,8 +53,7 @@ namespace RoslynRules.Tests.Core
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+                        rule.Compile(_compiler, _parameters, _namespaces);
 
             var result = rule.Execute(_parameters);
 
@@ -96,8 +97,7 @@ namespace RoslynRules.Tests.Core
 
             parent.ChildRules.Add(child);
 
-            var compiler = new ExpressionCompiler();
-            parent.Compile(compiler, _parameters, _namespaces);
+                        parent.Compile(_compiler, _parameters, _namespaces);
 
             var result = parent.Execute(_parameters);
 
@@ -107,3 +107,7 @@ namespace RoslynRules.Tests.Core
         }
     }
 }
+
+
+
+

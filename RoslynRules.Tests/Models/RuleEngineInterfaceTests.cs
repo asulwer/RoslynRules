@@ -1,3 +1,4 @@
+using FluentAssertions;
 using RoslynRules.Abstractions;
 using RoslynRules.Batch;
 using RoslynRules.Models;
@@ -37,7 +38,6 @@ namespace RoslynRules.Tests.Models
         public void Workflow_ViaInterface_CompileAndExecute()
         {
             IRuleEngine engine = new global::RoslynRules.Models.Workflow();
-            engine.Compile(_compileParams);
 
             var rule = new Rule
             {
@@ -51,6 +51,57 @@ namespace RoslynRules.Tests.Models
 
             Assert.Single(results);
             Assert.True(results[0].Success);
+        }
+
+        [Fact]
+        public void Workflow_ViaInterface_MutateRulesAfterCompile_Throws()
+        {
+            IRuleEngine engine = new global::RoslynRules.Models.Workflow();
+            ((Workflow)engine).Rules.Add(new Rule
+            {
+                Expression = "customer.Age >= 18",
+                Description = "Age check"
+            });
+
+            engine.Compile(_compileParams);
+
+            // ReadOnlyCollection throws NotSupportedException for mutation attempts
+            var ex = Assert.Throws<NotSupportedException>(() =>
+                ((Workflow)engine).Rules.Add(new Rule { Expression = "true" }));
+            Assert.Contains("read-only", ex.Message);
+        }
+
+        [Fact]
+        public void Workflow_ViaInterface_SetRulesAfterCompile_Throws()
+        {
+            IRuleEngine engine = new global::RoslynRules.Models.Workflow();
+            ((Workflow)engine).Rules.Add(new Rule
+            {
+                Expression = "customer.Age >= 18",
+                Description = "Age check"
+            });
+
+            engine.Compile(_compileParams);
+
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+                ((Workflow)engine).Rules = new List<Rule>());
+            Assert.Contains("cannot be modified after compilation", ex.Message);
+        }
+
+        [Fact]
+        public void Workflow_ViaInterface_ReadRulesAfterCompile_ReturnsReadOnly()
+        {
+            IRuleEngine engine = new global::RoslynRules.Models.Workflow();
+            ((Workflow)engine).Rules.Add(new Rule
+            {
+                Expression = "customer.Age >= 18",
+                Description = "Age check"
+            });
+
+            engine.Compile(_compileParams);
+
+            var rules = ((Workflow)engine).Rules;
+            rules.Should().BeOfType<System.Collections.ObjectModel.ReadOnlyCollection<Rule>>();
         }
 
         [Fact]

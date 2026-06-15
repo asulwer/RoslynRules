@@ -1,4 +1,5 @@
-using System.ComponentModel.DataAnnotations;
+using System;
+using System.Collections.Generic;
 
 namespace Demo.Models
 {
@@ -10,13 +11,22 @@ namespace Demo.Models
         /// <summary>
         /// Unique identifier for the customer.
         /// </summary>
-        [Key]
-        public Guid Id { get; } = Guid.NewGuid();
+        public Guid Id { get; set; } = Guid.NewGuid();
 
         /// <summary>
-        /// Customer full name. Can be modified by rule actions.
+        /// Customer full name.
         /// </summary>
         public string Name { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Customer age in years.
+        /// </summary>
+        public int Age { get; set; }
+
+        /// <summary>
+        /// Customer email address.
+        /// </summary>
+        public string Email { get; set; } = string.Empty;
 
         /// <summary>
         /// Whether the customer account is active.
@@ -24,20 +34,41 @@ namespace Demo.Models
         public bool IsActive { get; set; } = true;
 
         /// <summary>
+        /// Whether the customer is a VIP.
+        /// </summary>
+        public bool IsVip { get; set; }
+
+        /// <summary>
+        /// Account creation date.
+        /// </summary>
+        public DateTime CreatedDate { get; set; }
+
+        /// <summary>
+        /// Customer tags for segmentation.
+        /// </summary>
+        public List<string> Tags { get; set; } = new();
+
+        /// <summary>
+        /// Customer orders.
+        /// </summary>
+        public List<Order> Orders { get; set; } = new();
+
+        /// <summary>
         /// Compares customers by Id.
         /// </summary>
-        /// <param name="c">Other customer to compare.</param>
-        /// <returns>True if same Id.</returns>
         public bool Equals(Customer? c) => Id == c?.Id;
 
-        /// <summary>
-        /// Compares customers by Id.
-        /// </summary>
         public override bool Equals(object? obj) => Equals(obj as Customer);
+        public override int GetHashCode() => Id.GetHashCode();
+    }
 
-        /// <summary>
-        /// Hash code based on Id.
-        /// </summary>
-        public override int GetHashCode() => Id.GetHashCode();        
+    /// <summary>
+    /// Customer order for demo expressions.
+    /// </summary>
+    public class Order
+    {
+        public int Id { get; set; }
+        public double Total { get; set; }
+        public List<string> Items { get; set; } = new();
     }
 }

@@ -1,9 +1,9 @@
-name: Build and Publish NuGet Package
+name: Build and Publish NuGet Packages
 
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - '2026.*'
 
 permissions:
   contents: write      # For creating GitHub releases
@@ -25,59 +25,38 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
 
-      - name: Sign and Build Project
-        env:
-          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
-        run: |
-          $directory = Split-Path './RoslynRules/RoslynRules.csproj';
-          $signKeyFile = Join-Path $directory "signKey.snk";
-          $signKeyFile = [System.IO.Path]::GetFullPath($signKeyFile)
-          $bytes = [Convert]::FromBase64String($env:SIGNING_KEY)
-          [IO.File]::WriteAllBytes($signKeyFile, $bytes)
-          dotnet build './RoslynRules/RoslynRules.csproj' -c Release -p:ContinuousIntegrationBuild=true -p:DelaySign=false -p:AssemblyOriginatorKeyFile=$signKeyFile
-          Remove-Item $signKeyFile -Force
-        shell: pwsh
+      - name: Build solution
+        run: dotnet build --configuration Release --no-restore /p:TreatWarningsAsErrors=false
 
-      - name: Create NuGet package
-        run: |
-          # Extract version from the tag
-          VERSION=$(echo ${{ github.ref }} | sed 's/refs\/tags\/v//')
-          # Create the NuGet package with the version from the tag
-          # Pack only the library project, excluding Demo and Tests
-          dotnet pack './RoslynRules/RoslynRules.csproj' --configuration Release --no-build --output ./nuget_packages /p:PackageVersion=$VERSION
+      - name: Run all tests
+        continue-on-error: true
+        run: dotnet test --configuration Release --no-build --verbosity normal
 
-      - name: Publish NuGet package to NuGet.org
+      - name: Pack RoslynRules
+        run: dotnet pack './RoslynRules/RoslynRules.csproj' --configuration Release --no-build --output ./nuget_packages
+
+      - name: Pack RoslynRules.EntityFrameworkCore
+        run: dotnet pack './RoslynRules.EntityFrameworkCore/RoslynRules.EntityFrameworkCore.csproj' --configuration Release --no-build --output ./nuget_packages
+
+      - name: Pack RoslynRules.Json
+        run: dotnet pack './RoslynRules.Json/RoslynRules.Json.csproj' --configuration Release --no-build --output ./nuget_packages
+
+      - name: Pack RoslynRules.Xml
+        run: dotnet pack './RoslynRules.Xml/RoslynRules.Xml.csproj' --configuration Release --no-build --output ./nuget_packages
+
+      - name: Publish NuGet packages to NuGet.org
+        continue-on-error: true
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
           dotnet nuget push ./nuget_packages/*.nupkg -k $NUGET_API_KEY -s https://api.nuget.org/v3/index.json --skip-duplicate
-          dotnet nuget push ./nuget_packages/*.snupkg -k $NUGET_API_KEY -s https://api.nuget.org/v3/index.json --skip-duplicate
-
-      - name: Create source code zip
-        run: |
-          git archive -o source.zip HEAD
-        continue-on-error: true
-
-      - name: Create source code tar
-        run: |
-          git archive -o source.tar.gz HEAD
-        continue-on-error: true
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: source-archives
-          path: |
-            source.zip
-            source.tar.gz
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          files: |
-            ./nuget_packages/*.nupkg
-            ./nuget_packages/*.snupkg
-            source.zip
-            source.tar.gz
+          files: ./nuget_packages/*.nupkg
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

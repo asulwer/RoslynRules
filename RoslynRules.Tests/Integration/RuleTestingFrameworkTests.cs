@@ -23,14 +23,14 @@ namespace RoslynRules.Tests.Integration
         [Fact]
         public void ShouldPass_ActivePassingRule_DoesNotThrow()
         {
-            var result = new RuleResult(true, ruleDescription: "Test", isActive: true);
+            var result = new RuleResult(true, RuleDescription: "Test", IsActive: true);
             result.ShouldPass();
         }
 
         [Fact]
         public void ShouldPass_ActiveFailingRule_Throws()
         {
-            var result = new RuleResult(false, ruleDescription: "Test", isActive: true);
+            var result = new RuleResult(false, RuleDescription: "Test", IsActive: true);
             var act = () => result.ShouldPass();
             act.Should().Throw<RuleAssertionException>()
                 .WithMessage("*Expected rule 'Test' to pass*");
@@ -39,7 +39,7 @@ namespace RoslynRules.Tests.Integration
         [Fact]
         public void ShouldPass_InactiveRule_Throws()
         {
-            var result = new RuleResult(true, ruleDescription: "Test", isActive: false);
+            var result = new RuleResult(true, RuleDescription: "Test", IsActive: false);
             var act = () => result.ShouldPass();
             act.Should().Throw<RuleAssertionException>()
                 .WithMessage("*inactive*");
@@ -48,14 +48,14 @@ namespace RoslynRules.Tests.Integration
         [Fact]
         public void ShouldFail_ActiveFailingRule_DoesNotThrow()
         {
-            var result = new RuleResult(false, ruleDescription: "Test", isActive: true);
+            var result = new RuleResult(false, RuleDescription: "Test", IsActive: true);
             result.ShouldFail();
         }
 
         [Fact]
         public void ShouldFail_ActivePassingRule_Throws()
         {
-            var result = new RuleResult(true, ruleDescription: "Test", isActive: true);
+            var result = new RuleResult(true, RuleDescription: "Test", IsActive: true);
             var act = () => result.ShouldFail();
             act.Should().Throw<RuleAssertionException>()
                 .WithMessage("*Expected rule 'Test' to fail*");
@@ -64,14 +64,14 @@ namespace RoslynRules.Tests.Integration
         [Fact]
         public void ShouldBeInactive_InactiveRule_DoesNotThrow()
         {
-            var result = new RuleResult(true, ruleDescription: "Test", isActive: false);
+            var result = new RuleResult(true, RuleDescription: "Test", IsActive: false);
             result.ShouldBeInactive();
         }
 
         [Fact]
         public void ShouldBeInactive_ActiveRule_Throws()
         {
-            var result = new RuleResult(true, ruleDescription: "Test", isActive: true);
+            var result = new RuleResult(true, RuleDescription: "Test", IsActive: true);
             var act = () => result.ShouldBeInactive();
             act.Should().Throw<RuleAssertionException>()
                 .WithMessage("*Expected rule 'Test' to be inactive*");
@@ -80,14 +80,14 @@ namespace RoslynRules.Tests.Integration
         [Fact]
         public void ShouldHaveValue_MatchingValue_DoesNotThrow()
         {
-            var result = new RuleResult(true, ruleDescription: "Test", value: 42);
+            var result = new RuleResult(true, RuleDescription: "Test", Value: 42);
             result.ShouldHaveValue(42);
         }
 
         [Fact]
         public void ShouldHaveValue_MismatchedValue_Throws()
         {
-            var result = new RuleResult(true, ruleDescription: "Test", value: 42);
+            var result = new RuleResult(true, RuleDescription: "Test", Value: 42);
             var act = () => result.ShouldHaveValue(99);
             act.Should().Throw<RuleAssertionException>()
                 .WithMessage("*Expected rule 'Test' to return '99'*");
@@ -96,14 +96,14 @@ namespace RoslynRules.Tests.Integration
         [Fact]
         public void ShouldHaveValue_NonNullValue_DoesNotThrow()
         {
-            var result = new RuleResult(true, ruleDescription: "Test", value: "hello");
+            var result = new RuleResult(true, RuleDescription: "Test", Value: "hello");
             result.ShouldHaveValue();
         }
 
         [Fact]
         public void ShouldHaveValue_NullValue_Throws()
         {
-            var result = new RuleResult(true, ruleDescription: "Test", value: null);
+            var result = new RuleResult(true, RuleDescription: "Test", Value: null);
             var act = () => result.ShouldHaveValue();
             act.Should().Throw<RuleAssertionException>()
                 .WithMessage("*was null*");
@@ -112,14 +112,14 @@ namespace RoslynRules.Tests.Integration
         [Fact]
         public void ShouldHaveValueOfType_CorrectType_DoesNotThrow()
         {
-            var result = new RuleResult(true, ruleDescription: "Test", value: 42);
+            var result = new RuleResult(true, RuleDescription: "Test", Value: 42);
             result.ShouldHaveValueOfType<int>();
         }
 
         [Fact]
         public void ShouldHaveValueOfType_WrongType_Throws()
         {
-            var result = new RuleResult(true, ruleDescription: "Test", value: "hello");
+            var result = new RuleResult(true, RuleDescription: "Test", Value: "hello");
             var act = () => result.ShouldHaveValueOfType<int>();
             act.Should().Throw<RuleAssertionException>()
                 .WithMessage("*Expected rule 'Test' to return type 'Int32'*");
@@ -130,10 +130,10 @@ namespace RoslynRules.Tests.Integration
         {
             var children = new[]
             {
-                new RuleResult(true, ruleDescription: "Child1"),
-                new RuleResult(true, ruleDescription: "Child2")
+                new RuleResult(true, RuleDescription: "Child1"),
+                new RuleResult(true, RuleDescription: "Child2")
             };
-            var result = new RuleResult(true, ruleDescription: "Parent", childResults: children);
+            var result = new RuleResult(true, RuleDescription: "Parent", ChildResults: children);
             result.ShouldHaveAllChildrenPass();
         }
 
@@ -142,10 +142,10 @@ namespace RoslynRules.Tests.Integration
         {
             var children = new[]
             {
-                new RuleResult(true, ruleDescription: "Child1"),
-                new RuleResult(false, ruleDescription: "Child2")
+                new RuleResult(true, RuleDescription: "Child1"),
+                new RuleResult(false, RuleDescription: "Child2")
             };
-            var result = new RuleResult(false, ruleDescription: "Parent", childResults: children);
+            var result = new RuleResult(false, RuleDescription: "Parent", ChildResults: children);
             var act = () => result.ShouldHaveAllChildrenPass();
             act.Should().Throw<RuleAssertionException>()
                 .WithMessage("*Child2*");
@@ -156,10 +156,10 @@ namespace RoslynRules.Tests.Integration
         {
             var children = new[]
             {
-                new RuleResult(true, ruleDescription: "Child1"),
-                new RuleResult(false, ruleDescription: "Child2")
+                new RuleResult(true, RuleDescription: "Child1"),
+                new RuleResult(false, RuleDescription: "Child2")
             };
-            var result = new RuleResult(false, ruleDescription: "Parent", childResults: children);
+            var result = new RuleResult(false, RuleDescription: "Parent", ChildResults: children);
             result.ShouldHaveChildFailure();
         }
 
@@ -168,10 +168,10 @@ namespace RoslynRules.Tests.Integration
         {
             var children = new[]
             {
-                new RuleResult(true, ruleDescription: "Child1"),
-                new RuleResult(true, ruleDescription: "Child2")
+                new RuleResult(true, RuleDescription: "Child1"),
+                new RuleResult(true, RuleDescription: "Child2")
             };
-            var result = new RuleResult(true, ruleDescription: "Parent", childResults: children);
+            var result = new RuleResult(true, RuleDescription: "Parent", ChildResults: children);
             var act = () => result.ShouldHaveChildFailure();
             act.Should().Throw<RuleAssertionException>()
                 .WithMessage("*all passed*");
@@ -182,18 +182,18 @@ namespace RoslynRules.Tests.Integration
         {
             var children = new[]
             {
-                new RuleResult(true, ruleDescription: "Child1"),
-                new RuleResult(true, ruleDescription: "Child2")
+                new RuleResult(true, RuleDescription: "Child1"),
+                new RuleResult(true, RuleDescription: "Child2")
             };
-            var result = new RuleResult(true, ruleDescription: "Parent", childResults: children);
+            var result = new RuleResult(true, RuleDescription: "Parent", ChildResults: children);
             result.ShouldHaveChildCount(2);
         }
 
         [Fact]
         public void ShouldHaveChildCount_WrongCount_Throws()
         {
-            var children = new[] { new RuleResult(true, ruleDescription: "Child1") };
-            var result = new RuleResult(true, ruleDescription: "Parent", childResults: children);
+            var children = new[] { new RuleResult(true, RuleDescription: "Child1") };
+            var result = new RuleResult(true, RuleDescription: "Parent", ChildResults: children);
             var act = () => result.ShouldHaveChildCount(5);
             act.Should().Throw<RuleAssertionException>()
                 .WithMessage("*Expected 'Parent' to have 5 child results*");
@@ -204,10 +204,10 @@ namespace RoslynRules.Tests.Integration
         {
             var children = new[]
             {
-                new RuleResult(true, ruleDescription: "Child1"),
-                new RuleResult(true, ruleDescription: "Child2")
+                new RuleResult(true, RuleDescription: "Child1"),
+                new RuleResult(true, RuleDescription: "Child2")
             };
-            var result = new RuleResult(true, ruleDescription: "Parent", childResults: children);
+            var result = new RuleResult(true, RuleDescription: "Parent", ChildResults: children);
             var child = result.ShouldHaveChild("Child2");
             child.RuleDescription.Should().Be("Child2");
         }
@@ -215,8 +215,8 @@ namespace RoslynRules.Tests.Integration
         [Fact]
         public void ShouldHaveChild_NotFound_Throws()
         {
-            var children = new[] { new RuleResult(true, ruleDescription: "Child1") };
-            var result = new RuleResult(true, ruleDescription: "Parent", childResults: children);
+            var children = new[] { new RuleResult(true, RuleDescription: "Child1") };
+            var result = new RuleResult(true, RuleDescription: "Parent", ChildResults: children);
             var act = () => result.ShouldHaveChild("Missing");
             act.Should().Throw<RuleAssertionException>()
                 .WithMessage("*Missing*");
@@ -225,14 +225,14 @@ namespace RoslynRules.Tests.Integration
         [Fact]
         public void ShouldHaveThrown_CorrectType_DoesNotThrow()
         {
-            var result = new RuleResult(false, ruleDescription: "Test", exception: new InvalidOperationException("boom"));
+            var result = new RuleResult(false, RuleDescription: "Test", Exception: new InvalidOperationException("boom"));
             result.ShouldHaveThrown<InvalidOperationException>();
         }
 
         [Fact]
         public void ShouldHaveThrown_WrongType_Throws()
         {
-            var result = new RuleResult(false, ruleDescription: "Test", exception: new ArgumentException("bad"));
+            var result = new RuleResult(false, RuleDescription: "Test", Exception: new ArgumentException("bad"));
             var act = () => result.ShouldHaveThrown<InvalidOperationException>();
             act.Should().Throw<RuleAssertionException>()
                 .WithMessage("*InvalidOperationException*");
@@ -241,14 +241,14 @@ namespace RoslynRules.Tests.Integration
         [Fact]
         public void ShouldNotHaveThrown_NoException_DoesNotThrow()
         {
-            var result = new RuleResult(true, ruleDescription: "Test");
+            var result = new RuleResult(true, RuleDescription: "Test");
             result.ShouldNotHaveThrown();
         }
 
         [Fact]
         public void ShouldNotHaveThrown_Exception_Throws()
         {
-            var result = new RuleResult(false, ruleDescription: "Test", exception: new Exception("oops"));
+            var result = new RuleResult(false, RuleDescription: "Test", Exception: new Exception("oops"));
             var act = () => result.ShouldNotHaveThrown();
             act.Should().Throw<RuleAssertionException>()
                 .WithMessage("*oops*");
@@ -261,8 +261,8 @@ namespace RoslynRules.Tests.Integration
         {
             var results = new[]
             {
-                new RuleResult(true, ruleDescription: "R1"),
-                new RuleResult(true, ruleDescription: "R2")
+                new RuleResult(true, RuleDescription: "R1"),
+                new RuleResult(true, RuleDescription: "R2")
             };
             results.ShouldAllPass();
         }
@@ -272,8 +272,8 @@ namespace RoslynRules.Tests.Integration
         {
             var results = new[]
             {
-                new RuleResult(true, ruleDescription: "R1"),
-                new RuleResult(false, ruleDescription: "R2")
+                new RuleResult(true, RuleDescription: "R1"),
+                new RuleResult(false, RuleDescription: "R2")
             };
             var act = () => results.ShouldAllPass();
             act.Should().Throw<RuleAssertionException>()
@@ -285,8 +285,8 @@ namespace RoslynRules.Tests.Integration
         {
             var results = new[]
             {
-                new RuleResult(true, ruleDescription: "R1"),
-                new RuleResult(false, ruleDescription: "R2")
+                new RuleResult(true, RuleDescription: "R1"),
+                new RuleResult(false, RuleDescription: "R2")
             };
             results.ShouldHaveAnyFailure();
         }
@@ -296,8 +296,8 @@ namespace RoslynRules.Tests.Integration
         {
             var results = new[]
             {
-                new RuleResult(true, ruleDescription: "R1"),
-                new RuleResult(true, ruleDescription: "R2")
+                new RuleResult(true, RuleDescription: "R1"),
+                new RuleResult(true, RuleDescription: "R2")
             };
             var act = () => results.ShouldHaveAnyFailure();
             act.Should().Throw<RuleAssertionException>()
@@ -316,8 +316,8 @@ namespace RoslynRules.Tests.Integration
         {
             var results = new[]
             {
-                new RuleResult(true, ruleDescription: "Rule1"),
-                new RuleResult(true, ruleDescription: "Rule2")
+                new RuleResult(true, RuleDescription: "Rule1"),
+                new RuleResult(true, RuleDescription: "Rule2")
             };
             var found = results.ShouldContainRule("Rule2");
             found.RuleDescription.Should().Be("Rule2");

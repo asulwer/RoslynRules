@@ -16,14 +16,17 @@ namespace RoslynRules.Predicates
         /// <summary>
         /// Creates a rule that passes when the parameter is not null.
         /// </summary>
-        /// <param name="parameterName">Name of the parameter to validate.</param>
+        /// <param name="parameterName">Name of the parameter to validate. Accepts dotted member-access paths (e.g., "order.CustomerId").</param>
         /// <param name="description">Optional description for the rule.</param>
         public static Rule IsNotNull(string parameterName, string? description = null)
-            => new Rule
+        {
+            ValidateParameterName(parameterName);
+            return new Rule
             {
                 Description = description ?? $"{parameterName} is not null",
                 Expression = $"{parameterName} != null"
             };
+        }
 
         /// <summary>
         /// Creates a rule that passes when the string parameter is not null or empty.
@@ -333,6 +336,57 @@ namespace RoslynRules.Predicates
 
             // For numeric types and everything else, use invariant culture ToString
             return Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? "null";
+        }
+
+        /// <summary>
+        /// Validates that a parameter name is safe for use in generated C# code.
+        /// Accepts dotted member-access paths (e.g., "customer.Name") but rejects
+        /// names that would produce invalid C# identifiers.
+        /// </summary>
+        private static void ValidateParameterName(string parameterName)
+        {
+            if (string.IsNullOrWhiteSpace(parameterName))
+                throw new ArgumentException("Parameter name cannot be null or empty.", nameof(parameterName));
+
+            // Dotted paths like "order.CustomerId" are valid C# member access
+            // Each segment must be a valid identifier
+            var segments = parameterName.Split('.');
+            foreach (var segment in segments)
+            {
+                if (string.IsNullOrEmpty(segment))
+                    throw new ArgumentException(
+                        $"Parameter name '{parameterName}' contains empty segments. " +
+                        "Dotted paths must not have consecutive dots or leading/trailing dots.",
+                        nameof(parameterName));
+
+                if (!IsValidIdentifier(segment))
+                    throw new ArgumentException(
+                        $"Parameter name segment '{segment}' in '{parameterName}' is not a valid C# identifier. " +
+                        "Identifiers must start with a letter or underscore and contain only letters, digits, or underscores.",
+                        nameof(parameterName));
+            }
+        }
+
+        /// <summary>
+        /// Checks if a string is a valid C# identifier.
+        /// </summary>
+        private static bool IsValidIdentifier(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return false;
+
+            // First character: letter or underscore
+            if (!char.IsLetter(name[0]) && name[0] != '_')
+                return false;
+
+            // Remaining characters: letter, digit, or underscore
+            for (int i = 1; i < name.Length; i++)
+            {
+                if (!char.IsLetterOrDigit(name[i]) && name[i] != '_')
+                    return false;
+            }
+
+            return true;
         }
     }
 }

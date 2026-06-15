@@ -48,13 +48,12 @@ namespace RoslynRules.Tests.Execution
         [Fact]
         public async Task ExpressionCompiler_Concurrent_CompileSameExpression_OnlyCompilesOnce()
         {
-            var compiler = new ExpressionCompiler();
-            var expression = "x == 1";
+                        var expression = "x == 1";
             var paramNames = new[] { "x" };
 
             // Compile the same expression from multiple threads simultaneously
             var tasks = Enumerable.Range(0, 10)
-                .Select(_ => Task.Run(() => compiler.Compile<Func<int, bool>>(expression, paramNames)))
+                .Select(_ => Task.Run(() => _compiler.Compile<Func<int, bool>>(expression, paramNames)))
                 .ToArray();
 
             await Task.WhenAll(tasks);
@@ -74,8 +73,7 @@ namespace RoslynRules.Tests.Execution
         [Fact]
         public async Task ExpressionCompiler_Concurrent_CompileDifferentExpressions_AllSucceed()
         {
-            var compiler = new ExpressionCompiler();
-            var expressions = new[]
+                        var expressions = new[]
             {
                 "x == 1",
                 "x > 0",
@@ -85,7 +83,7 @@ namespace RoslynRules.Tests.Execution
             };
 
             var tasks = expressions
-                .Select(expr => Task.Run(() => compiler.Compile<Func<int, bool>>(expr, new[] { "x" })))
+                .Select(expr => Task.Run(() => _compiler.Compile<Func<int, bool>>(expr, new[] { "x" })))
                 .ToArray();
 
             await Task.WhenAll(tasks);
@@ -110,8 +108,8 @@ namespace RoslynRules.Tests.Execution
                 }
             };
 
-            var json = RoslynRules.Extensions.JsonRuleLoader.Serialize(original);
-            var restored = RoslynRules.Extensions.JsonRuleLoader.Deserialize(json);
+            var json = RoslynRules.Json.JsonRuleLoader.Serialize(original);
+            var restored = RoslynRules.Json.JsonRuleLoader.DeserializeWorkflow(json);
 
             Assert.Equal(original.Id, restored.Id);
             Assert.Single(restored.Rules);
@@ -141,8 +139,8 @@ namespace RoslynRules.Tests.Execution
                 Rules = { parent }
             };
 
-            var json = RoslynRules.Extensions.JsonRuleLoader.Serialize(workflow);
-            var restored = RoslynRules.Extensions.JsonRuleLoader.Deserialize(json);
+            var json = RoslynRules.Json.JsonRuleLoader.Serialize(workflow);
+            var restored = RoslynRules.Json.JsonRuleLoader.DeserializeWorkflow(json);
 
             Assert.Single(restored.Rules);
             Assert.Single(restored.Rules[0].ChildRules);
@@ -200,6 +198,7 @@ namespace RoslynRules.Tests.Execution
         [Fact]
         public void ExpressionCompiler_CompileLimit_RecyclesContext()
         {
+            // This test needs its own compiler with a specific recycle limit
             var compiler = new ExpressionCompiler(maxCompilesBeforeRecycle: 3);
             var paramNames = new[] { "x" };
 
@@ -228,23 +227,25 @@ namespace RoslynRules.Tests.Execution
         [Fact]
         public void ExpressionCompiler_Unload_ClearsCacheAndRecyclesContext()
         {
-            var compiler = new ExpressionCompiler();
-            var paramNames = new[] { "x" };
+                        var paramNames = new[] { "x" };
 
-            var d1 = compiler.Compile<Func<int, bool>>("x == 1", paramNames);
+            var d1 = _compiler.Compile<Func<int, bool>>("x == 1", paramNames);
             Assert.True(d1(1));
-            Assert.Equal(1, compiler.CompileCount);
+            Assert.Equal(1, _compiler.CompileCount);
 
-            var contextBefore = compiler.CurrentContextName;
-            compiler.Unload();
-            var contextAfter = compiler.CurrentContextName;
+            var contextBefore = _compiler.CurrentContextName;
+            _compiler.Unload();
+            var contextAfter = _compiler.CurrentContextName;
 
-            Assert.Equal(0, compiler.CompileCount);
+            Assert.Equal(0, _compiler.CompileCount);
             Assert.NotEqual(contextBefore, contextAfter);
 
             // After unload, recompiling the same expression works
-            var d2 = compiler.Compile<Func<int, bool>>("x == 1", paramNames);
+            var d2 = _compiler.Compile<Func<int, bool>>("x == 1", paramNames);
             Assert.True(d2(1));
         }
     }
 }
+
+
+

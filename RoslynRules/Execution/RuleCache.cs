@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 
 namespace RoslynRules.Execution
 {
@@ -14,7 +15,7 @@ namespace RoslynRules.Execution
         /// <summary>
         /// Attempts to retrieve a cached result that has not expired.
         /// </summary>
-        public bool TryGet(string key, out Models.RuleResult result)
+        public bool TryGet(string key, [NotNullWhen(true)] out Models.RuleResult result)
         {
             if (_cache.TryGetValue(key, out var entry) && entry.Expires > DateTime.UtcNow)
             {

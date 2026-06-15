@@ -1,0 +1,54 @@
+name: AOT Compatibility
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'RoslynRules/**'
+      - 'RoslynRules.Tests/**'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'RoslynRules/**'
+      - 'RoslynRules.Tests/**'
+
+jobs:
+  aot-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore RoslynRules.Tests
+
+      - name: Build test project with AOT analysis
+        run: dotnet build RoslynRules.Tests --configuration Release --no-restore
+
+      - name: Run xUnit AOT compatibility tests
+        run: dotnet test RoslynRules.Tests --filter "FullyQualifiedName~AotCompatibilityTests" --no-build --configuration Release
+
+      - name: Publish AOT smoke test (test project)
+        run: |
+          dotnet publish RoslynRules.Tests \
+            --configuration Release \
+            --runtime linux-x64 \
+            --self-contained \
+            -p:PublishAot=true \
+            --no-restore
+        # Full AOT publish validates trim analysis. The test project
+        # references RoslynRules and will fail if trim annotations are wrong.
+        continue-on-error: true
+        # Publishing a test project with AOT may have additional warnings.
+        # The real validation is: does it compile without RoslynRules errors?

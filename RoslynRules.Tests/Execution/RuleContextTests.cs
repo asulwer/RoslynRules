@@ -38,7 +38,7 @@ namespace RoslynRules.Tests.Execution
         [Fact]
         public void TryGetValue_RuleFailed_ReturnsFalse()
         {
-            _context.StoreResult(_ruleId, new RuleResult(false, _ruleId, "Test", true, exception: new InvalidOperationException("fail")));
+            _context.StoreResult(_ruleId, new RuleResult(false, _ruleId, "Test", true, Exception: new InvalidOperationException("fail")));
 
             bool found = _context.TryGetValue<int>(_ruleId, out var value);
 

@@ -51,6 +51,8 @@ namespace RoslynRules.Compiler
             string[]? additionalNamespaces = null,
             AssemblyReferenceProvider? referenceProvider = null) where TDelegate : Delegate
         {
+            AotCompatibility.ThrowIfAot("ExpressionCompiler.Compile<TDelegate>");
+
             // STEP 1: Build a unique cache key.
             var cacheKey = BuildCacheKey<TDelegate>(expression, parameterNames, additionalNamespaces);
 

@@ -108,13 +108,13 @@ namespace RoslynRules.Batch
         /// Compiles all rules in the batch using a shared ExpressionCompiler.
         /// Single compile pass for all rules.
         /// </summary>
-        public void Compile(RuleParameter[] parameters, string[]? additionalNamespaces = null)
+        public void Compile(RuleParameter[] parameters, string[]? additionalNamespaces = null, Compiler.AssemblyReferenceProvider? referenceProvider = null)
         {
             Validate();
 
             foreach (var rule in _rules.Where(r => r.IsActive))
             {
-                rule.Compile(_compiler, parameters, additionalNamespaces);
+                rule.Compile(_compiler, parameters, additionalNamespaces, referenceProvider);
             }
 
             _isCompiled = true;

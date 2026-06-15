@@ -13,6 +13,7 @@ namespace RoslynRules.Tests.Execution
     {
         private readonly RuleParameter[] _parameters;
         private readonly string[] _namespaces;
+        private readonly ExpressionCompiler _compiler;
 
         public RuleEdgeCaseTests()
         {
@@ -21,6 +22,7 @@ namespace RoslynRules.Tests.Execution
                 new RuleParameter("customer", typeof(TestCustomer), new TestCustomer { Age = 25, Name = "Alice", IsAdult = false })
             };
             _namespaces = new[] { "RoslynRules.Tests", "System" };
+            _compiler = TestCompiler.Instance;
         }
 
         [Fact]
@@ -33,13 +35,13 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+            
+            rule.Compile(_compiler, _parameters, _namespaces);
 
             var result = rule.Execute(_parameters);
 
             result.Success.Should().BeTrue();
-            result.Value.Should().Be(true); // Assignment returns true
+            result.Value.Should().BeNull(); // Actions return null, not the assignment result
             var customer = (TestCustomer)_parameters[0].Value!;
             customer.IsAdult.Should().BeTrue();
         }
@@ -70,8 +72,8 @@ namespace RoslynRules.Tests.Execution
                 Logger = logger
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+            
+            rule.Compile(_compiler, _parameters, _namespaces);
             rule.Execute(_parameters);
 
             logger.EventIds.Should().ContainSingle();
@@ -88,15 +90,15 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            var act = () => rule.Compile(compiler, _parameters, _namespaces);
+            
+            var act = () => rule.Compile(_compiler, _parameters, _namespaces);
             act.Should().Throw<Exception>()
                 .WithInnerException<InvalidOperationException>()
                 .WithMessage("*Compilation failed*");
         }
 
         [Fact]
-        public void Compile_MultipleParameters_ThrowsNotSupported()
+        public void Compile_MultipleParameters_CompilesSuccessfully()
         {
             var parameters = new[]
             {
@@ -107,14 +109,68 @@ namespace RoslynRules.Tests.Execution
             var rule = new Rule
             {
                 Description = "Multi-param",
-                Expression = "true",
+                Expression = "a > 0 && b > 0",
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            var act = () => rule.Compile(compiler, parameters, _namespaces);
-            act.Should().Throw<NotSupportedException>()
-                .WithMessage("*exactly one*");
+            
+            // Act - should compile and execute successfully
+            rule.Compile(_compiler, parameters, _namespaces);
+            
+            // Assert - rule should be executable (no exception = compiled successfully)
+            var result = rule.Execute(parameters);
+            result.Success.Should().BeTrue();
+        }
+
+        [Fact]
+        public void Execute_MultipleParameters_DifferentTypes()
+        {
+            var parameters = new[]
+            {
+                new RuleParameter("name", typeof(string), "Alice"),
+                new RuleParameter("age", typeof(int), 25)
+            };
+
+            var rule = new Rule
+            {
+                Description = "Multi-param types",
+                Expression = "name.Length > 0 && age >= 18",
+                IsActive = true
+            };
+
+            rule.Compile(_compiler, parameters, _namespaces);
+            
+            var result = rule.Execute(parameters);
+            result.Success.Should().BeTrue();
+        }
+
+        [Fact]
+        public void Execute_MultipleParameters_FailsWhenExpressionFalse()
+        {
+            var parameters = new[]
+            {
+                new RuleParameter("x", typeof(int), 5),
+                new RuleParameter("y", typeof(int), 3)
+            };
+
+            var rule = new Rule
+            {
+                Description = "Multi-param false",
+                Expression = "x > y",
+                IsActive = true
+            };
+
+            rule.Compile(_compiler, parameters, _namespaces);
+            
+            // Should fail when x <= y
+            var failParams = new[]
+            {
+                new RuleParameter("x", typeof(int), 1),
+                new RuleParameter("y", typeof(int), 10)
+            };
+            
+            var result = rule.Execute(failParams);
+            result.Success.Should().BeFalse();
         }
 
         [Fact]
@@ -128,8 +184,8 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+            
+            rule.Compile(_compiler, _parameters, _namespaces);
 
             var result = rule.Execute(_parameters);
 
@@ -149,8 +205,8 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+            
+            rule.Compile(_compiler, _parameters, _namespaces);
 
             var result = rule.Execute(_parameters);
 
@@ -170,8 +226,8 @@ namespace RoslynRules.Tests.Execution
             };
 
             var customNamespaces = new[] { "RoslynRules.Tests", "System" };
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, customNamespaces);
+            
+            rule.Compile(_compiler, _parameters, customNamespaces);
 
             var result = rule.Execute(_parameters);
             result.Success.Should().BeTrue();
@@ -187,8 +243,8 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+            
+            rule.Compile(_compiler, _parameters, _namespaces);
 
             var act = () => rule.Expression = "false";
             act.Should().Throw<RuleCompilationException>()
@@ -205,8 +261,8 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+            
+            rule.Compile(_compiler, _parameters, _namespaces);
 
             var act = () => rule.Description = "New description";
             act.Should().Throw<RuleCompilationException>();
@@ -223,8 +279,8 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+            
+            rule.Compile(_compiler, _parameters, _namespaces);
 
             var act = () => rule.Action = "customer.IsAdult = false";
             act.Should().Throw<RuleCompilationException>();
@@ -240,8 +296,8 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+            
+            rule.Compile(_compiler, _parameters, _namespaces);
 
             var result = rule.Execute(_parameters);
 
@@ -263,8 +319,8 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, parameters, _namespaces);
+            
+            rule.Compile(_compiler, parameters, _namespaces);
 
             var result = rule.Execute(parameters);
 
@@ -274,3 +330,5 @@ namespace RoslynRules.Tests.Execution
         }
     }
 }
+
+

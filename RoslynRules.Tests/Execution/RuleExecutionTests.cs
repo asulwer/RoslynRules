@@ -10,8 +10,11 @@ namespace RoslynRules.Tests.Execution
         private readonly RuleParameter[] _parameters;
         private readonly string[] _namespaces;
 
+        private readonly ExpressionCompiler _compiler;
+
         public RuleExecutionTests()
         {
+            _compiler = TestCompiler.Instance;
             _parameters = new[]
             {
                 new RuleParameter("customer", typeof(TestCustomer), new TestCustomer { Age = 25, Name = "Alice" })
@@ -29,8 +32,7 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+                        rule.Compile(_compiler, _parameters, _namespaces);
 
             var result = rule.Execute(_parameters);
 
@@ -47,8 +49,7 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+                        rule.Compile(_compiler, _parameters, _namespaces);
 
             var result = rule.Execute(_parameters);
 
@@ -65,8 +66,7 @@ namespace RoslynRules.Tests.Execution
                 IsActive = false
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+                        rule.Compile(_compiler, _parameters, _namespaces);
 
             var result = rule.Execute(_parameters);
 
@@ -91,8 +91,7 @@ namespace RoslynRules.Tests.Execution
                 IsActive = true
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, parameters, _namespaces);
+                        rule.Compile(_compiler, parameters, _namespaces);
 
             var result = rule.Execute(parameters);
 
@@ -119,8 +118,7 @@ namespace RoslynRules.Tests.Execution
 
             parent.ChildRules.Add(child);
 
-            var compiler = new ExpressionCompiler();
-            parent.Compile(compiler, _parameters, _namespaces);
+                        parent.Compile(_compiler, _parameters, _namespaces);
 
             var result = parent.Execute(_parameters);
 
@@ -146,8 +144,7 @@ namespace RoslynRules.Tests.Execution
 
             parent.ChildRules.Add(child);
 
-            var compiler = new ExpressionCompiler();
-            parent.Compile(compiler, _parameters, _namespaces);
+                        parent.Compile(_compiler, _parameters, _namespaces);
 
             var result = parent.Execute(_parameters);
 
@@ -155,12 +152,12 @@ namespace RoslynRules.Tests.Execution
         }
 
         [Fact]
-        public void Compile_MultipleParameters_ThrowsNotSupportedException()
+        public void Compile_MultipleParameters_CompilesSuccessfully()
         {
             var rule = new Rule
             {
                 Description = "Multi-param",
-                Expression = "true",
+                Expression = "a > 0 && b > 0",
                 IsActive = true
             };
 
@@ -170,11 +167,12 @@ namespace RoslynRules.Tests.Execution
                 new RuleParameter("b", typeof(int), 2)
             };
 
-            var compiler = new ExpressionCompiler();
-            var act = () => rule.Compile(compiler, parameters, _namespaces);
+            // Act - should not throw
+            rule.Compile(_compiler, parameters, _namespaces);
             
-            act.Should().Throw<NotSupportedException>()
-                .WithMessage("*Rules support exactly one input parameter*");
+            // Assert - rule should be executable (no exception = compiled successfully)
+            var result = rule.Execute(parameters);
+            result.Success.Should().BeTrue();
         }
 
         [Fact]
@@ -190,6 +188,81 @@ namespace RoslynRules.Tests.Execution
             var act = () => rule.Execute(_parameters);
             act.Should().Throw<RoslynRules.Exceptions.NotCompiledException>()
                 .WithMessage("*must be compiled before execution*");
+        }
+        [Fact]
+        public void Execute_ParameterNameMismatch_ThrowsInvalidOperationException()
+        {
+            var rule = new Rule
+            {
+                Description = "Name mismatch test",
+                Expression = "customer.Age >= 18",
+                IsActive = true
+            };
+
+            var compileParams = new[]
+            {
+                new RuleParameter("customer", typeof(TestCustomer), new TestCustomer { Age = 25, Name = "Alice" })
+            };
+            var executeParams = new[]
+            {
+                new RuleParameter("cust", typeof(TestCustomer), new TestCustomer { Age = 25, Name = "Alice" })
+            };
+
+                        rule.Compile(_compiler, compileParams, _namespaces);
+
+            var act = () => rule.Execute(executeParams);
+            act.Should().Throw<RoslynRules.Exceptions.RuleValidationException>()
+                .WithMessage("*Expected parameter name 'customer'*")
+                .WithMessage("*but received 'cust'*");
+        }
+
+        [Fact]
+        public void Execute_ParameterTypeMismatch_ThrowsArgumentException()
+        {
+            var rule = new Rule
+            {
+                Description = "Type mismatch test",
+                Expression = "customer.Age >= 18",
+                IsActive = true
+            };
+
+            var compileParams = new[]
+            {
+                new RuleParameter("customer", typeof(TestCustomer), new TestCustomer { Age = 25, Name = "Alice" })
+            };
+            var executeParams = new[]
+            {
+                new RuleParameter("customer", typeof(string), "not a customer")
+            };
+
+                        rule.Compile(_compiler, compileParams, _namespaces);
+
+            var act = () => rule.Execute(executeParams);
+            act.Should().Throw<RoslynRules.Exceptions.RuleValidationException>()
+                .WithMessage("*Expected type 'TestCustomer'*")
+                .WithMessage("*but received 'String'*");
+        }
+
+        [Fact]
+        public void Execute_ParameterNameAndTypeMatch_Succeeds()
+        {
+            var rule = new Rule
+            {
+                Description = "Matching parameters",
+                Expression = "customer.Age >= 18",
+                IsActive = true
+            };
+
+            var parameters = new[]
+            {
+                new RuleParameter("customer", typeof(TestCustomer), new TestCustomer { Age = 25, Name = "Alice" })
+            };
+
+                        rule.Compile(_compiler, parameters, _namespaces);
+
+            var result = rule.Execute(parameters);
+
+            result.Success.Should().BeTrue();
         }
     }
 }

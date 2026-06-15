@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace RoslynRules.Models
@@ -137,20 +139,80 @@ namespace RoslynRules.Models
     }
 
     /// <summary>
+    /// Multi-parameter compiled delegate that uses DynamicInvoke with an object array.
+    /// Slightly slower than the typed single-parameter wrappers, but supports any number of parameters.
+    /// </summary>
+    internal sealed class CompiledMultiParamDelegate : CompiledDelegate
+    {
+        private readonly Delegate _delegate;
+
+        public CompiledMultiParamDelegate(Delegate del) => _delegate = del;
+
+        public override object? Invoke(object? parameter)
+        {
+            // For multi-parameter delegates, parameter is expected to be a RuleParameter[]
+            if (parameter is RuleParameter[] paramArray)
+            {
+                var args = paramArray.Select(p => p.Value).ToArray();
+                return _delegate.DynamicInvoke(args);
+            }
+            
+            // Single parameter passed directly (fallback)
+            return _delegate.DynamicInvoke(parameter);
+        }
+    }
+
+    /// <summary>
+    /// Async multi-parameter compiled delegate that uses DynamicInvoke with an object array.
+    /// </summary>
+    internal sealed class CompiledAsyncMultiParamDelegate : CompiledDelegate
+    {
+        private readonly Delegate _delegate;
+
+        public CompiledAsyncMultiParamDelegate(Delegate del) => _delegate = del;
+
+        public override object? Invoke(object? parameter)
+        {
+            if (parameter is RuleParameter[] paramArray)
+            {
+                var args = paramArray.Select(p => p.Value).ToArray();
+                dynamic task = _delegate.DynamicInvoke(args)!;
+                return task.ConfigureAwait(false).GetAwaiter().GetResult();
+            }
+            
+            dynamic singleTask = _delegate.DynamicInvoke(parameter)!;
+            return singleTask.ConfigureAwait(false).GetAwaiter().GetResult();
+        }
+
+        public async Task<object?> InvokeAsync(object? parameter)
+        {
+            if (parameter is RuleParameter[] paramArray)
+            {
+                var args = paramArray.Select(p => p.Value).ToArray();
+                dynamic task = _delegate.DynamicInvoke(args)!;
+                return await task;
+            }
+            
+            dynamic singleTask = _delegate.DynamicInvoke(parameter)!;
+            return await singleTask;
+        }
+    }
+
+    /// <summary>
     /// Factory that creates the appropriate CompiledDelegate wrapper from a raw Delegate.
-    /// Supports exactly one input parameter.
+    /// Supports single and multiple input parameters.
     /// Automatically detects async delegates (returning Task or Task<T>) and wraps accordingly.
     /// </summary>
     internal static class CompiledDelegateFactory
     {
         /// <summary>
         /// Wraps a raw Delegate in a typed CompiledDelegate for fast invocation.
-        /// Only supports single-parameter delegates.
+        /// Supports single and multi-parameter delegates.
+        /// For multi-parameter delegates, uses DynamicInvoke (slower but necessary).
         /// Detects async signatures (Task/Task<T> return types) automatically.
         /// </summary>
         /// <param name="del">The raw compiled delegate.</param>
         /// <returns>A CompiledDelegate wrapper.</returns>
-        /// <exception cref="NotSupportedException">Thrown for multi-parameter delegates.</exception>
         [RequiresUnreferencedCode("RoslynRules uses reflection to inspect delegate signatures and instantiate generic wrappers. This code may not work correctly with trimming or AOT.")]
         public static CompiledDelegate Wrap(Delegate del)
         {
@@ -159,10 +221,16 @@ namespace RoslynRules.Models
             var parameters = invoke.GetParameters();
             var returnType = invoke.ReturnType;
 
-            if (parameters.Length != 1)
-                throw new NotSupportedException(
-                    $"Only single-parameter delegates are supported. Found {parameters.Length} parameters. " +
-                    "Wrap multiple inputs in a struct/class.");
+            // Multi-parameter delegates use the slower DynamicInvoke path
+            if (parameters.Length > 1)
+            {
+                if (returnType == typeof(Task) || 
+                    (returnType.IsGenericType && returnType.GetGenericTypeDefinition() == typeof(Task<>)))
+                {
+                    return new CompiledAsyncMultiParamDelegate(del);
+                }
+                return new CompiledMultiParamDelegate(del);
+            }
 
             var paramType = parameters[0].ParameterType;
 

@@ -9,7 +9,15 @@ namespace RoslynRules.Models
     /// Includes detailed information about which rule ran, why it failed,
     /// and results from child rules for full traceability.
     /// </summary>
-    public readonly struct RuleResult
+    /// <remarks>
+    /// Uses a readonly struct to avoid per-result heap allocation.
+    /// Stored in generic collections (List&lt;T&gt;, Dictionary&lt;K,V&gt;) which
+    /// hold structs inline without boxing. Interface access (IReadOnlyList,
+    /// IEnumerable) does not box the values themselves in modern .NET.
+    /// Benchmarks show struct is competitive with class for large hierarchies
+    /// and avoids GC pressure for high-throughput scenarios.
+    /// </remarks>
+    public readonly record struct RuleResult
     {
         /// <summary>
         /// True if the rule passed all evaluations (expression and children).
@@ -52,21 +60,21 @@ namespace RoslynRules.Models
         /// Initializes a new rule result with full details.
         /// </summary>
         public RuleResult(
-            bool success,
-            Guid ruleId = default,
-            string ruleDescription = "",
-            bool isActive = true,
-            object? value = null,
-            Exception? exception = null,
-            IReadOnlyList<RuleResult>? childResults = null)
+            bool Success,
+            Guid RuleId = default,
+            string RuleDescription = "",
+            bool IsActive = true,
+            object? Value = null,
+            Exception? Exception = null,
+            IReadOnlyList<RuleResult>? ChildResults = null)
         {
-            Success = success;
-            RuleId = ruleId;
-            RuleDescription = ruleDescription;
-            IsActive = isActive;
-            Value = value;
-            Exception = exception;
-            ChildResults = childResults ?? Array.Empty<RuleResult>();
+            this.Success = Success;
+            this.RuleId = RuleId;
+            this.RuleDescription = RuleDescription;
+            this.IsActive = IsActive;
+            this.Value = Value;
+            this.Exception = Exception;
+            this.ChildResults = ChildResults ?? Array.Empty<RuleResult>();
         }
 
         /// <summary>

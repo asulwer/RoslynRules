@@ -3,7 +3,6 @@ using RoslynRules.Compiler;
 using RoslynRules.Exceptions;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -22,9 +21,11 @@ namespace RoslynRules.Models
     public class Workflow : IRuleEngine
     {
         private ExpressionCompiler _compiler = new ExpressionCompiler();
+        private List<Rule> _rules = new List<Rule>();
+        private bool _isCompiled;
 
         /// <summary>
-        /// EF Core requires a parameterless constructor.
+        /// Initializes a new workflow with default values.
         /// </summary>
         public Workflow()
         {
@@ -33,12 +34,53 @@ namespace RoslynRules.Models
         /// <summary>
         /// Unique identifier for the workflow.
         /// </summary>
-        [Key] public Guid Id { get; init; } = Guid.NewGuid();
+        public Guid Id { get; init; } = Guid.NewGuid();
 
         /// <summary>
         /// Human-readable description of the workflow.
         /// </summary>
         public string Description { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Semantic version of this workflow. Used for tracking changes and compatibility.
+        /// Defaults to 1.0.0 for new workflows.
+        /// </summary>
+        public RuleVersion Version
+        {
+            get => _version;
+            set
+            {
+                if (_isCompiled)
+                    throw new InvalidOperationException("Workflow.Version cannot be modified after compilation.");
+                _version = value;
+            }
+        }
+        private RuleVersion _version = new(1, 0, 0);
+
+        /// <summary>
+        /// When this workflow was created.
+        /// </summary>
+        public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// When this workflow was last modified.
+        /// </summary>
+        public DateTime ModifiedAt
+        {
+            get => _modifiedAt;
+            set
+            {
+                if (_isCompiled)
+                    throw new InvalidOperationException("Workflow.ModifiedAt cannot be modified after compilation.");
+                _modifiedAt = value;
+            }
+        }
+        private DateTime _modifiedAt = DateTime.UtcNow;
+
+        /// <summary>
+        /// Optional identifier of the user/system that last modified this workflow.
+        /// </summary>
+        public string? ModifiedBy { get; set; }
 
         /// <summary>
         /// When false, the entire workflow and its rules are skipped.
@@ -47,10 +89,93 @@ namespace RoslynRules.Models
 
         /// <summary>
         /// Top-level rules in this workflow. Child rules are nested inside their parents.
+        /// Returns IReadOnlyList after compilation to enforce immutability.
         /// </summary>
-        public virtual IList<Rule> Rules { get; set; } = new List<Rule>();
+        /// <exception cref="InvalidOperationException">Thrown when setting Rules after compilation.</exception>
+        public IList<Rule> Rules
+        {
+            get => _isCompiled ? _rules.AsReadOnly() : _rules;
+            set
+            {
+                if (_isCompiled)
+                    throw new InvalidOperationException("Workflow.Rules cannot be modified after compilation.");
+                _rules = value is List<Rule> list ? list : value?.ToList() ?? new List<Rule>();
+            }
+        }
 
-        // ==================== VALIDATION ====================
+        /// <summary>
+        /// Checks if all rules in this workflow have compatible versions with the target workflow.
+        /// Rules with the same major version and equal or greater minor/patch are compatible.
+        /// </summary>
+        /// <param name="target">The workflow to compare against.</param>
+        /// <returns>True if this workflow's version is compatible with the target.</returns>
+        public bool IsVersionCompatibleWith(Workflow target)
+        {
+            return Version.IsCompatibleWith(target.Version);
+        }
+
+        /// <summary>
+        /// Gets a dictionary of all rules by their version status.
+        /// Useful for migration planning and compatibility analysis.
+        /// </summary>
+        /// <returns>Dictionary of rule IDs to their versions.</returns>
+        public Dictionary<Guid, RuleVersion> GetRuleVersions()
+        {
+            var result = new Dictionary<Guid, RuleVersion>();
+            foreach (var rule in Rules)
+            {
+                CollectRuleVersions(rule, result);
+            }
+            return result;
+        }
+
+        private static void CollectRuleVersions(Rule rule, Dictionary<Guid, RuleVersion> versions)
+        {
+            versions[rule.Id] = rule.Version;
+            foreach (var child in rule.ChildRules)
+            {
+                CollectRuleVersions(child, versions);
+            }
+        }
+
+        /// <summary>
+        /// Bumps the major version (resetting minor and patch to 0).
+        /// Use for breaking changes.
+        /// </summary>
+        public void BumpMajorVersion(string? modifiedBy = null)
+        {
+            if (_isCompiled)
+                throw new InvalidOperationException("Workflow version cannot be modified after compilation.");
+            _version = _version.IncrementMajor();
+            _modifiedAt = DateTime.UtcNow;
+            ModifiedBy = modifiedBy;
+        }
+
+        /// <summary>
+        /// Bumps the minor version (resetting patch to 0).
+        /// Use for new features (backward compatible).
+        /// </summary>
+        public void BumpMinorVersion(string? modifiedBy = null)
+        {
+            if (_isCompiled)
+                throw new InvalidOperationException("Workflow version cannot be modified after compilation.");
+            _version = _version.IncrementMinor();
+            _modifiedAt = DateTime.UtcNow;
+            ModifiedBy = modifiedBy;
+        }
+
+        /// <summary>
+        /// Bumps the patch version.
+        /// Use for bug fixes (backward compatible).
+        /// </summary>
+        public void BumpPatchVersion(string? modifiedBy = null)
+        {
+            if (_isCompiled)
+                throw new InvalidOperationException("Workflow version cannot be modified after compilation.");
+            _version = _version.IncrementPatch();
+            _modifiedAt = DateTime.UtcNow;
+            ModifiedBy = modifiedBy;
+        }
 
         /// <summary>
         /// Validates the entire workflow and all contained rules.
@@ -105,10 +230,11 @@ namespace RoslynRules.Models
                 return errors.ToArray();
             }
 
-            // 2. Validate each top-level rule.
+            // 2. Validate each top-level rule, passing available IDs for dependency checks.
+            var availableIds = activeRules.Select(r => r.Id).ToList();
             foreach (var rule in activeRules)
             {
-                errors.AddRange(rule.ValidateAll());
+                errors.AddRange(rule.ValidateAll(availableIds));
             }
 
             // 3. Detect duplicate rule IDs within this workflow.
@@ -213,12 +339,14 @@ namespace RoslynRules.Models
         /// </summary>
         /// <param name="parameters">Parameter definitions used for compilation.</param>
         /// <param name="additionalNamespaces">Extra namespaces for expression compilation.</param>
-        public void Compile(RuleParameter[] parameters, string[]? additionalNamespaces = null)
+        public void Compile(RuleParameter[] parameters, string[]? additionalNamespaces = null, Compiler.AssemblyReferenceProvider? referenceProvider = null)
         {
-            foreach (var rule in Rules.Where(r => r.IsActive))
+            AotCompatibility.ThrowIfAot(nameof(Compile));
+            foreach (var rule in _rules.Where(r => r.IsActive))
             {
-                rule.Compile(_compiler, parameters, additionalNamespaces);
+                rule.Compile(_compiler, parameters, additionalNamespaces, referenceProvider);
             }
+            _isCompiled = true;
         }
 
         // ==================== DEPENDENCY MANAGEMENT ====================
@@ -227,78 +355,29 @@ namespace RoslynRules.Models
         /// Builds a topologically sorted list of rules respecting both Priority and DependsOnRuleId.
         /// Rules with dependencies execute after their dependencies.
         /// Within the same dependency level, higher Priority executes first.
+        /// Delegates to GraphAlgorithms.TopologicalSort for the core algorithm.
         /// </summary>
         /// <returns>Rules in execution order.</returns>
         private List<Rule> GetExecutionOrder()
         {
             var activeRules = Rules.Where(r => r.IsActive).ToList();
-            if (!activeRules.Any(r => r.DependsOnRuleId.HasValue))
-            {
-                // No dependencies — simple priority sort
-                return activeRules.OrderByDescending(r => r.Priority).ToList();
-            }
 
-            // Kahn&apos;s algorithm for topological sort with priority
-            var inDegree = new Dictionary<Guid, int>();
-            var adjacency = new Dictionary<Guid, List<Guid>>();
-
-            foreach (var rule in activeRules)
+            // Stable comparer: higher priority first, then preserve original list order
+            var indexMap = activeRules.Select((r, i) => new { r.Id, Index = i }).ToDictionary(x => x.Id, x => x.Index);
+            var priorityComparer = Comparer<Rule>.Create((a, b) =>
             {
-                inDegree[rule.Id] = 0;
-                adjacency[rule.Id] = new List<Guid>();
-            }
-
-            foreach (var rule in activeRules)
-            {
-                if (rule.DependsOnRuleId.HasValue && adjacency.ContainsKey(rule.DependsOnRuleId.Value))
-                {
-                    adjacency[rule.DependsOnRuleId.Value].Add(rule.Id);
-                    inDegree[rule.Id]++;
-                }
-            }
-
-            var result = new List<Rule>();
-            var queue = new SortedSet<Rule>(Comparer<Rule>.Create((a, b) =>
-            {
-                // Higher priority first; use Id as tiebreaker for stable sort
                 var priorityCompare = b.Priority.CompareTo(a.Priority);
-                return priorityCompare != 0 ? priorityCompare : a.Id.CompareTo(b.Id);
-            }));
+                if (priorityCompare != 0) return priorityCompare;
+                // Stable sort: preserve original list order for equal priorities
+                return indexMap[a.Id].CompareTo(indexMap[b.Id]);
+            });
 
-            // Start with all rules that have no dependencies
-            foreach (var rule in activeRules.Where(r => inDegree[r.Id] == 0))
-            {
-                queue.Add(rule);
-            }
-
-            while (queue.Count > 0)
-            {
-                var current = queue.Min;
-                if (current == null) break;
-                queue.Remove(current);
-                result.Add(current);
-
-                foreach (var neighborId in adjacency[current.Id])
-                {
-                    inDegree[neighborId]--;
-                    if (inDegree[neighborId] == 0)
-                    {
-                        var neighbor = activeRules.First(r => r.Id == neighborId);
-                        queue.Add(neighbor);
-                    }
-                }
-            }
-
-            // Cycle detection: if we didn&apos;t process all rules, there&apos;s a cycle
-            if (result.Count != activeRules.Count)
-            {
-                var unprocessed = activeRules.First(r => !result.Any(res => res.Id == r.Id));
-                throw new CircularReferenceException(unprocessed.Id, $"Dependency cycle detected at rule &apos;{unprocessed.Description}&apos;");
-            }
-
-            return result;
+            return GraphAlgorithms.TopologicalSort(
+                activeRules,
+                r => r.Id,
+                r => r.DependsOnRuleId,
+                priorityComparer);
         }
-
         // ==================== SYNCHRONOUS EXECUTION ====================
 
         /// <summary>
@@ -490,9 +569,10 @@ namespace RoslynRules.Models
                 index += batch.Count;
             }
 
-            // Return in original rule order (not dependency order)
+            // Return results in original rule order (sorted by priority, with dependencies before dependents)
             var activeRules = Rules.Where(r => r.IsActive).ToArray();
-            return activeRules.Select(r => allResults.First(ar => ar.RuleId == r.Id)).ToArray();
+            var resultById = allResults.ToDictionary(r => r.RuleId);
+            return activeRules.Select(r => resultById[r.Id]).ToArray();
         }
 
         /// <summary>

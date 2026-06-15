@@ -2,6 +2,7 @@ using RoslynRules.Models;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 
 namespace RoslynRules.Execution
 {
@@ -44,7 +45,7 @@ namespace RoslynRules.Execution
         public bool HasResult(Guid ruleId) => _results.ContainsKey(ruleId);
 
         /// <summary>
-        /// Gets the typed value from a rule&apos;s result.
+        /// Gets the typed value from a rule's result.
         /// Returns default(T) if the rule is not found, failed, or has no value.
         /// </summary>
         /// <typeparam name="T">The expected type of the value.</typeparam>
@@ -60,14 +61,14 @@ namespace RoslynRules.Execution
         }
 
         /// <summary>
-        /// Tries to get the typed value from a rule&apos;s result.
+        /// Tries to get the typed value from a rule's result.
         /// Distinguishes between rule not found, rule failed, and successful retrieval.
         /// </summary>
-        /// <typeref name="T">The expected type of the value.</typeref>
+        /// <typeparam name="T">The expected type of the value.</typeparam>
         /// <param name="ruleId">The unique identifier of the rule.</param>
         /// <param name="value">The typed value if the rule succeeded and the value is of type T.</param>
         /// <returns>True if the rule succeeded and a value of type T was found; otherwise false.</returns>
-        public bool TryGetValue<T>(Guid ruleId, out T? value)
+        public bool TryGetValue<T>(Guid ruleId, [MaybeNullWhen(false)] out T value)
         {
             if (_results.TryGetValue(ruleId, out var result))
             {
@@ -77,7 +78,7 @@ namespace RoslynRules.Execution
                     return true;
                 }
             }
-            value = default;
+            value = default!;
             return false;
         }
 

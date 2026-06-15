@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>true</IsPackable>
+    <LangVersion>12.0</LangVersion>
+
+    <!-- Enable trim annotations for AOT/trimming compatibility -->
+    <IsTrimmable>true</IsTrimmable>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+
+    <!-- NuGet Package Metadata -->
+    <PackageId>RoslynRules.Xml</PackageId>
+    <Authors>Aaron Sulwer</Authors>
+    <Description>XML serialization support for RoslynRules workflows and rules. Provides XmlRuleLoader for saving and loading rules from XML with AOT/trimming support.</Description>
+    <PackageTags>roslynrules;rules;xml;serialization;workflow;aot;trimming</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/asulwer/RoslynRules</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/asulwer/RoslynRules</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <VersionPrefix>1.0</VersionPrefix>
+    <BuildDate>$([System.DateTime]::Now.ToString('yyMMdd'))</BuildDate>
+    <BuildTime>$([System.DateTime]::Now.ToString('HHmm'))</BuildTime>
+    <Version>$(VersionPrefix).$(BuildDate).$(BuildTime)</Version>
+    <PackageVersion>$(VersionPrefix).$(BuildDate).$(BuildTime)</PackageVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RoslynRules\RoslynRules.csproj" />
+  </ItemGroup>
+
+</Project>

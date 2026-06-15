@@ -123,7 +123,7 @@ namespace RoslynRules.Tests.Execution
             };
 
             var act = () => workflow.Validate();
-            act.Should().Throw<Exception>(); // Will be caught as either RuleValidationException or InvalidOperationException
+            act.Should().Throw<CircularReferenceException>();
         }
 
         [Fact]
@@ -154,7 +154,7 @@ namespace RoslynRules.Tests.Execution
         {
             var context = new RuleContext();
             var ruleId = Guid.NewGuid();
-            var expectedResult = new RuleResult(true, ruleId, "Test", true, value: 42);
+            var expectedResult = new RuleResult(true, ruleId, "Test", true, Value: 42);
 
             context.StoreResult(ruleId, expectedResult);
             var retrieved = context.GetResult(ruleId);
@@ -168,7 +168,7 @@ namespace RoslynRules.Tests.Execution
         {
             var context = new RuleContext();
             var ruleId = Guid.NewGuid();
-            var result = new RuleResult(true, ruleId, "Test", true, value: "hello");
+            var result = new RuleResult(true, ruleId, "Test", true, Value: "hello");
 
             context.StoreResult(ruleId, result);
             var value = context.GetValue<string>(ruleId);
@@ -181,7 +181,7 @@ namespace RoslynRules.Tests.Execution
         {
             var context = new RuleContext();
             var ruleId = Guid.NewGuid();
-            var result = new RuleResult(true, ruleId, "Test", true, value: "hello");
+            var result = new RuleResult(true, ruleId, "Test", true, Value: "hello");
 
             context.StoreResult(ruleId, result);
             var value = context.GetValue<int>(ruleId); // Wrong type

@@ -1,45 +1,32 @@
-using System.Reflection;
+using Demo.Data;
+using Demo.Demos;
 
-namespace Demo
+namespace Demo;
+
+internal class Program
 {
-    /// <summary>
-    /// Entry point that discovers and runs all IDemo implementations in the assembly.
-    /// </summary>
-    internal class Program
+    static async Task Main(string[] args)
     {
-        /// <summary>
-        /// Main entry point. Scans the assembly for IDemo implementations,
-        /// instantiates each, runs it, and reports execution time.
-        /// </summary>
-        /// <param name="args">Command line arguments (unused).</param>
-        static async Task Main(string[] args)
-        {
-            using (var cts = new CancellationTokenSource())
-            {
-                var assembly = Assembly.GetExecutingAssembly();
-                var demoTypes = assembly.GetTypes().Where(t => typeof(IDemo).IsAssignableFrom(t) && !t.IsInterface && !t.IsAbstract).ToList();
+        DemoRunner.LoadCustomers();
+        await SeedData.InitializeAsync();
 
-                foreach (var type in demoTypes)
-                {
-                    try
-                    {
-                        if (Activator.CreateInstance(type) is IDemo demo)
-                        {
-                            Console.WriteLine($"{type.Name} started");
+        await DemoRunner.Run("Basic Predicates", BasicPredicatesDemo.Run);
+        await DemoRunner.Run("Rule Chaining", RuleChainingDemo.Run);
+        await DemoRunner.Run("Child Rules", ChildRulesDemo.Run);
+        await DemoRunner.Run("Async Expressions", AsyncExpressionsDemo.Run);
+        await DemoRunner.Run("Custom Types", CustomTypesDemo.Run);
+        await DemoRunner.Run("ExpandoObject", ExpandoObjectDemo.Run);
+        await DemoRunner.Run("JSON Round-Trip", JsonRoundTripDemo.Run);
+        await DemoRunner.Run("Workflow vs RuleBatch", WorkflowVsRuleBatchDemo.Run);
+        await DemoRunner.Run("Template Instantiation", TemplateInstantiationDemo.Run);
+        await DemoRunner.Run("Multi-Parameter", MultiParameterDemo.Run);
+        await DemoRunner.Run("Caching", CachingDemo.Run);
+        await DemoRunner.Run("Priority Ordering", PriorityOrderingDemo.Run);
+        await DemoRunner.Run("Entity Framework", EntityFrameworkDemo.Run);
+        await DemoRunner.Run("Workflow Compile", WorkflowCompileDemo.Run);
+        await DemoRunner.Run("Lifecycle Events", LifecycleEventsDemo.Run);
 
-                            DateTime start = DateTime.Now;
-                            await demo.Run(cts.Token);
-                            DateTime end = DateTime.Now;
-
-                            Console.WriteLine($"{type.Name} completed in {(end - start).TotalMilliseconds}ms");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error executing Run on {type.Name}: {ex.Message}");
-                    }
-                }
-            }
-        }
+        Console.WriteLine();
+        Console.WriteLine("=== All demos completed ===");
     }
 }

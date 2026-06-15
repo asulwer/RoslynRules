@@ -45,7 +45,8 @@ namespace RoslynRules.Templates
             Dictionary<string, object> values,
             ExpressionCompiler compiler,
             RuleParameter[] parameters,
-            string[] assemblies)
+            string[] assemblies,
+            Compiler.AssemblyReferenceProvider? referenceProvider = null)
         {
             if (string.IsNullOrWhiteSpace(Expression))
                 throw new InvalidOperationException("Template Expression is not set.");
@@ -77,7 +78,7 @@ namespace RoslynRules.Templates
                 IsActive = true
             };
 
-            rule.Compile(compiler, parameters, assemblies);
+            rule.Compile(compiler, parameters, assemblies, referenceProvider);
             return rule;
         }
 

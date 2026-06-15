@@ -13,8 +13,11 @@ namespace RoslynRules.Tests.Execution
         private readonly RuleParameter[] _parameters;
         private readonly string[] _namespaces;
 
+        private readonly ExpressionCompiler _compiler;
+
         public PartialResultTests()
         {
+            _compiler = TestCompiler.Instance;
             _parameters = new[]
             {
                 new RuleParameter("customer", typeof(TestCustomer), new TestCustomer { Age = 25, Name = "Alice" })
@@ -41,8 +44,7 @@ namespace RoslynRules.Tests.Execution
 
             parent.ChildRules.Add(child);
 
-            var compiler = new ExpressionCompiler();
-            parent.Compile(compiler, _parameters, _namespaces);
+                        parent.Compile(_compiler, _parameters, _namespaces);
 
             var result = parent.Execute(_parameters);
 
@@ -76,8 +78,7 @@ namespace RoslynRules.Tests.Execution
 
             parent.ChildRules.Add(child);
 
-            var compiler = new ExpressionCompiler();
-            parent.Compile(compiler, _parameters, _namespaces);
+                        parent.Compile(_compiler, _parameters, _namespaces);
 
             var result = parent.Execute(_parameters);
 
@@ -113,8 +114,7 @@ namespace RoslynRules.Tests.Execution
             parent.ChildRules.Add(child1);
             parent.ChildRules.Add(child2);
 
-            var compiler = new ExpressionCompiler();
-            parent.Compile(compiler, _parameters, _namespaces);
+                        parent.Compile(_compiler, _parameters, _namespaces);
 
             var result = parent.Execute(_parameters);
 
@@ -139,8 +139,7 @@ namespace RoslynRules.Tests.Execution
                 IsActive = false
             };
 
-            var compiler = new ExpressionCompiler();
-            rule.Compile(compiler, _parameters, _namespaces);
+                        rule.Compile(_compiler, _parameters, _namespaces);
 
             var result = rule.Execute(_parameters);
 
@@ -150,3 +149,7 @@ namespace RoslynRules.Tests.Execution
         }
     }
 }
+
+
+
+

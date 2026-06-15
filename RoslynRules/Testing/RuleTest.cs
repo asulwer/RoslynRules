@@ -231,7 +231,7 @@ namespace RoslynRules.Testing
                     Guid.Empty,
                     _workflow.Description,
                     true,
-                    childResults: results);
+                    ChildResults: results);
 
             return ApplyAssertions(result);
         }
@@ -275,7 +275,7 @@ namespace RoslynRules.Testing
                     Guid.Empty,
                     _workflow.Description,
                     true,
-                    childResults: results);
+                    ChildResults: results);
 
             return ApplyAssertions(result);
         }

@@ -12,14 +12,22 @@ namespace RoslynRules.Tests.Core
     public class ExceptionTests
     {
         [Fact]
-        public void RuleExecutionException_Constructor()
+        public void RuleTimeoutException_Constructor()
         {
             var id = Guid.NewGuid();
-            var inner = new InvalidOperationException("inner");
-            var ex = new RuleExecutionException(id, inner);
+            var timeout = TimeSpan.FromSeconds(5);
+            var ex = new RuleTimeoutException(id, timeout);
             ex.RuleId.Should().Be(id);
+            ex.Timeout.Should().Be(timeout);
             ex.Message.Should().Contain(id.ToString());
-            ex.InnerException.Should().Be(inner);
+            ex.Message.Should().Contain("5");
+        }
+
+        [Fact]
+        public void RuleTimeoutException_InheritsFromRulesException()
+        {
+            var ex = new RuleTimeoutException(Guid.NewGuid(), TimeSpan.FromSeconds(1));
+            Assert.IsAssignableFrom<RulesException>(ex);
         }
 
         [Fact]
