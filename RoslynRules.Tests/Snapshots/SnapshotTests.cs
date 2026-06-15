@@ -4,6 +4,9 @@ using RoslynRules.Models;
 using RoslynRules.Snapshots;
 using RoslynRules.Xml;
 using System;
+using System.IO;
+using System.Text.Json;
+using System.Xml;
 using Xunit;
 
 namespace RoslynRules.Tests.Snapshots;
@@ -317,6 +320,330 @@ public class SnapshotTests
 
             loaded.Description.Should().Be("File Snapshot Test");
             loaded.Rules.Should().HaveCount(1);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    // ==================== COMPLEX SCENARIOS ====================
+
+    [Fact]
+    public void JsonSnapshotSerializer_ComplexNestedRules_RoundTrip()
+    {
+        var workflow = new Workflow
+        {
+            Description = "Complex Workflow",
+            Rules =
+            {
+                new Rule
+                {
+                    Description = "Parent Rule",
+                    Expression = "x > 0",
+                    Priority = 10,
+                    Action = "result = x * 2",
+                    Timeout = TimeSpan.FromSeconds(30),
+                    CacheDuration = TimeSpan.FromMinutes(5),
+                    ChildRules =
+                    {
+                        new Rule
+                        {
+                            Description = "Child 1",
+                            Expression = "x > 10",
+                            Priority = 5,
+                            DependsOnRuleId = Guid.NewGuid()
+                        },
+                        new Rule
+                        {
+                            Description = "Child 2",
+                            Expression = "x < 100",
+                            Priority = 3,
+                            Action = "result = x / 2",
+                            ChildRules =
+                            {
+                                new Rule
+                                {
+                                    Description = "Grandchild",
+                                    Expression = "x == 50",
+                                    Priority = 1
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        var snapshot = WorkflowSnapshot.FromWorkflow(workflow);
+        var serializer = new JsonSnapshotSerializer();
+
+        var json = serializer.Serialize(snapshot);
+        var restored = serializer.DeserializeWorkflow(json);
+
+        restored.Description.Should().Be("Complex Workflow");
+        restored.Rules.Should().HaveCount(1);
+        
+        var parent = restored.Rules[0];
+        parent.Description.Should().Be("Parent Rule");
+        parent.ChildRules.Should().HaveCount(2);
+        
+        var child2 = parent.ChildRules[1];
+        child2.ChildRules.Should().HaveCount(1);
+        child2.ChildRules[0].Description.Should().Be("Grandchild");
+    }
+
+    [Fact]
+    public void XmlSnapshotSerializer_AllOptionalFields_RoundTrip()
+    {
+        var workflow = new Workflow
+        {
+            Id = Guid.NewGuid(),
+            Description = "All Fields Test",
+            ModifiedBy = "test-user",
+            Version = new RuleVersion(1, 2, 3, "beta.1", "build.456"),
+            CreatedAt = DateTime.UtcNow.AddDays(-1),
+            ModifiedAt = DateTime.UtcNow,
+            IsActive = true,
+            Rules =
+            {
+                new Rule
+                {
+                    Id = Guid.NewGuid(),
+                    Description = "Full Rule",
+                    DescriptionKey = "rule.full.description",
+                    Expression = "customer.Age >= 18",
+                    Action = "customer.IsAdult = true",
+                    IsActive = true,
+                    Priority = 100,
+                    Timeout = TimeSpan.FromSeconds(60),
+                    CacheDuration = TimeSpan.FromMinutes(10),
+                    WorkflowId = Guid.NewGuid(),
+                    ParentRuleId = Guid.NewGuid(),
+                    DependsOnRuleId = Guid.NewGuid(),
+                    ModifiedBy = "rule-author",
+                    Version = new RuleVersion(2, 0, 0),
+                    CreatedAt = DateTime.UtcNow.AddHours(-2),
+                    ModifiedAt = DateTime.UtcNow.AddHours(-1)
+                }
+            }
+        };
+
+        var snapshot = WorkflowSnapshot.FromWorkflow(workflow);
+        var serializer = new XmlSnapshotSerializer();
+
+        var xml = serializer.Serialize(snapshot);
+        var restored = serializer.DeserializeWorkflow(xml);
+
+        restored.Id.Should().Be(workflow.Id);
+        restored.Description.Should().Be("All Fields Test");
+        restored.ModifiedBy.Should().Be("test-user");
+        restored.Version.Should().Be(new RuleVersion(1, 2, 3, "beta.1", "build.456"));
+        
+        var rule = restored.Rules[0];
+        rule.DescriptionKey.Should().Be("rule.full.description");
+        rule.Action.Should().Be("customer.IsAdult = true");
+        rule.Timeout.Should().Be(TimeSpan.FromSeconds(60));
+        rule.CacheDuration.Should().Be(TimeSpan.FromMinutes(10));
+        rule.WorkflowId.Should().Be(workflow.Rules[0].WorkflowId);
+        rule.ParentRuleId.Should().Be(workflow.Rules[0].ParentRuleId);
+        rule.DependsOnRuleId.Should().Be(workflow.Rules[0].DependsOnRuleId);
+        rule.ModifiedBy.Should().Be("rule-author");
+    }
+
+    [Fact]
+    public void JsonSnapshotSerializer_MultipleRulesWithDependencies_RoundTrip()
+    {
+        var rule1Id = Guid.NewGuid();
+        var rule2Id = Guid.NewGuid();
+        
+        var workflow = new Workflow
+        {
+            Description = "Dependency Chain",
+            Rules =
+            {
+                new Rule
+                {
+                    Id = rule1Id,
+                    Description = "First Rule",
+                    Expression = "true",
+                    Priority = 10
+                },
+                new Rule
+                {
+                    Id = rule2Id,
+                    Description = "Second Rule",
+                    Expression = "result == true",
+                    Priority = 5,
+                    DependsOnRuleId = rule1Id
+                }
+            }
+        };
+
+        var snapshot = WorkflowSnapshot.FromWorkflow(workflow);
+        var serializer = new JsonSnapshotSerializer();
+
+        var json = serializer.Serialize(snapshot);
+        var restored = serializer.DeserializeWorkflow(json);
+
+        restored.Rules.Should().HaveCount(2);
+        restored.Rules[1].DependsOnRuleId.Should().Be(rule1Id);
+    }
+
+    // ==================== ERROR HANDLING ====================
+
+    [Fact]
+    public void JsonSnapshotSerializer_InvalidJson_ThrowsJsonException()
+    {
+        var serializer = new JsonSnapshotSerializer();
+        var invalidJson = "{ not valid json }";
+
+        Action act = () => serializer.DeserializeWorkflow(invalidJson);
+        
+        act.Should().Throw<JsonException>();
+    }
+
+    [Fact]
+    public void JsonSnapshotSerializer_EmptyString_ThrowsJsonException()
+    {
+        var serializer = new JsonSnapshotSerializer();
+        
+        Action act = () => serializer.DeserializeWorkflow(string.Empty);
+        
+        act.Should().Throw<JsonException>();
+    }
+
+    [Fact]
+    public void JsonSnapshotSerializer_NullString_ThrowsArgumentNullException()
+    {
+        var serializer = new JsonSnapshotSerializer();
+        
+        Action act = () => serializer.DeserializeWorkflow(null!);
+        
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void XmlSnapshotSerializer_InvalidXml_ThrowsXmlException()
+    {
+        var serializer = new XmlSnapshotSerializer();
+        var invalidXml = "<not valid xml";
+
+        Action act = () => serializer.DeserializeWorkflow(invalidXml);
+        
+        act.Should().Throw<System.Xml.XmlException>();
+    }
+
+    [Fact]
+    public void XmlSnapshotSerializer_EmptyString_ThrowsXmlException()
+    {
+        var serializer = new XmlSnapshotSerializer();
+        
+        Action act = () => serializer.DeserializeWorkflow(string.Empty);
+        
+        act.Should().Throw<System.Xml.XmlException>();
+    }
+
+    [Fact]
+    public void XmlSnapshotSerializer_WrongRootElement_ParsesWithDefaults()
+    {
+        // Wrong root element will still parse, but with default values
+        var serializer = new XmlSnapshotSerializer();
+        var wrongXml = "<WrongRoot><Description>test</Description></WrongRoot>";
+
+        // This should NOT throw - it will parse with defaults
+        var result = serializer.DeserializeWorkflow(wrongXml);
+        
+        // The result will have default values since the XML structure doesn't match
+        result.Should().NotBeNull();
+    }
+
+    // ==================== SERIALIZER EXTENSIONS ====================
+
+    [Fact]
+    public void JsonSnapshotSerializer_SaveAndLoadWorkflow_FileRoundTrip()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            var workflow = new Workflow
+            {
+                Description = "Extension Method Test",
+                Rules =
+                {
+                    new Rule { Description = "R1", Expression = "x > 0", Priority = 5 }
+                }
+            };
+
+            var snapshot = WorkflowSnapshot.FromWorkflow(workflow);
+            var serializer = new JsonSnapshotSerializer();
+
+            // Use extension method
+            serializer.SaveWorkflowToFile(snapshot, path);
+            var loaded = serializer.LoadWorkflowFromFile(path);
+
+            loaded.Description.Should().Be("Extension Method Test");
+            loaded.Rules[0].Priority.Should().Be(5);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void XmlSnapshotSerializer_SaveAndLoadWorkflow_FileRoundTrip()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            var workflow = new Workflow
+            {
+                Description = "XML Extension Method Test",
+                Rules =
+                {
+                    new Rule { Description = "R1", Expression = "x > 0", Priority = 10 }
+                }
+            };
+
+            var snapshot = WorkflowSnapshot.FromWorkflow(workflow);
+            var serializer = new XmlSnapshotSerializer();
+
+            // Use extension method
+            serializer.SaveWorkflowToFile(snapshot, path);
+            var loaded = serializer.LoadWorkflowFromFile(path);
+
+            loaded.Description.Should().Be("XML Extension Method Test");
+            loaded.Rules[0].Priority.Should().Be(10);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void JsonSnapshotSerializer_SaveAndLoadRule_FileRoundTrip()
+    {
+        var path = Path.GetTempFileName();
+        try
+        {
+            var rule = new Rule
+            {
+                Description = "Rule Extension Test",
+                Expression = "x > 0",
+                Priority = 15
+            };
+
+            var snapshot = RuleSnapshot.FromRule(rule);
+            var serializer = new JsonSnapshotSerializer();
+
+            // Use extension method for Rule
+            serializer.SaveRuleToFile(snapshot, path);
+            var loaded = serializer.LoadRuleFromFile(path);
+
+            loaded.Description.Should().Be("Rule Extension Test");
+            loaded.Priority.Should().Be(15);
         }
         finally
         {
