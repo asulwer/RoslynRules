@@ -17,7 +17,6 @@ RoslynRules supports AOT deployment via **pre-compiled snapshots**. Rules cannot
 |-----------|----------|----------|
 | Load rules from JSON/EF | ✅ Yes | ✅ Yes |
 | `Workflow.Validate()` | ✅ Yes | ✅ Yes |
-| `Workflow.GetExecutionOrder()` | ✅ Yes | ✅ Yes |
 | `Rule.Compile()` (from string) | ✅ Yes | ❌ **Not supported** |
 | `Rule.Execute()` without snapshot | ✅ Yes | ❌ Throws error |
 | `Rule.Execute()` with snapshot | ✅ Yes | ✅ Yes |
@@ -129,14 +128,20 @@ Your app can also detect mode:
 ```csharp
 bool isAot = !RuntimeFeature.IsDynamicCodeSupported;
 
+var serializer = new JsonSnapshotSerializer();
+
 if (isAot)
 {
-    workflow.LoadSnapshots("snapshots/");
+    // Load a pre-compiled snapshot and restore the workflow.
+    var snapshot = SnapshotManager.LoadSnapshot(serializer, "snapshots/workflow.snap.json");
+    var workflow = SnapshotManager.RestoreWorkflow(snapshot);
 }
 else
 {
-    workflow.Compile(parameters);
-    workflow.SaveSnapshots("snapshots/");
+    // Compile and save a snapshot for later AOT execution.
+    var compiled = CompiledWorkflow.Compile(workflow, parameters);
+    var snapshot = compiled.ToSnapshot();
+    SnapshotManager.SaveSnapshot(snapshot, serializer, "snapshots/workflow.snap.json");
 }
 ```
 
@@ -148,7 +153,6 @@ These work in AOT without snapshots:
 
 - `Workflow` / `Rule` model creation
 - `Workflow.Validate()` — syntax validation
-- `Workflow.GetExecutionOrder()` — dependency resolution
 - `RuleResult` creation and inspection
 - `RuleContext` result storage
 - `GraphAlgorithms.TopologicalSort()`
@@ -170,7 +174,7 @@ The `.github/workflows/aot.yml` workflow validates AOT-safe APIs compile without
 dotnet test RoslynRules.Tests --filter "FullyQualifiedName~AotCompatibilityTests"
 ```
 
-This runs 8 tests covering model creation, validation, `RuleResult`, `RuleContext`, and execution order — all without runtime compilation.
+These tests cover model creation, validation, `RuleResult`, `RuleContext`, and execution order — all without runtime compilation.
 
 ---
 

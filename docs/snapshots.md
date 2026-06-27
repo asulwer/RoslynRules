@@ -71,16 +71,14 @@ var workflow = new Workflow
     }
 };
 
-// 2. Compile the workflow (JIT only)
+// 2. Define compile-time parameters (JIT only)
 var parameters = new[]
 {
     new RuleParameter("order", typeof(Order), null),
     new RuleParameter("customer", typeof(Customer), null)
 };
 
-workflow.Compile(parameters);
-
-// 3. Create a snapshot
+// 3. Create a snapshot (CompiledWorkflow.Compile compiles the workflow internally)
 var snapshot = SnapshotManager.CreateSnapshot(
     CompiledWorkflow.Compile(workflow, parameters));
 
@@ -158,7 +156,6 @@ public static void Main(string[] args)
         var workflow = JsonRuleLoader.LoadWorkflowFromFile(ruleFile);
         var parameters = GetParametersFor(ruleFile);
 
-        workflow.Compile(parameters);
         var snapshot = SnapshotManager.CreateSnapshot(
             CompiledWorkflow.Compile(workflow, parameters));
 
@@ -258,5 +255,3 @@ if (!snapshot.Version.IsCompatibleWith(expectedVersion))
 
 - [AOT Compatibility](./aot-compatibility.md) — Detailed AOT detection and troubleshooting
 - [Performance Tuning](./performance-tuning.md) — Optimize rule execution
-- [API Reference: SnapshotManager](../api/snapshotmanager.md)
-- [API Reference: ISnapshotSerializer](../api/isnapshotserializer.md)

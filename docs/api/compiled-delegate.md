@@ -5,7 +5,7 @@ parent: API Reference
 nav_order: 9
 ---
 
-[← Back to API Reference](api-reference.md)
+[← Back to API Reference](../api-reference.md)
 
 # CompiledDelegate
 
@@ -207,23 +207,22 @@ var result = compiled.Invoke(new[]
 
 ### Integration with Rule execution
 
+> **Note:** `CompiledDelegate`, its wrappers, and `CompiledDelegateFactory` are `internal`.
+> They are not part of the public API; the snippet below is conceptual and illustrates how the
+> engine wraps a delegate internally. Application code should call `Rule.Compile(...)` /
+> `Rule.Execute(...)` instead of constructing these types directly.
+
+`ExpressionCompiler.Compile<TDelegate>` is generic and takes the parameter **names** as a
+`string[]` (not a `RuleParameter[]`). For a single-parameter `Customer` expression:
+
 ```csharp
-public class RuleExecutor
-{
-    private readonly CompiledDelegate _compiledExpression;
+// Conceptual — illustrates internal wrapping.
+var rawDelegate = compiler.Compile<Func<Customer, bool>>(
+    "customer.IsActive",
+    new[] { "customer" });
 
-    public RuleExecutor(Rule rule, ExpressionCompiler compiler)
-    {
-        var rawDelegate = compiler.Compile(rule.Expression, rule.Parameters);
-        _compiledExpression = CompiledDelegateFactory.Wrap(rawDelegate);
-    }
-
-    public bool Evaluate(object parameter)
-    {
-        var result = _compiledExpression.Invoke(parameter);
-        return (bool)result!;
-    }
-}
+var compiled = CompiledDelegateFactory.Wrap(rawDelegate); // internal
+var result = compiled.Invoke(customer); // true / false (as object?)
 ```
 
 ---
@@ -247,4 +246,4 @@ For best performance, prefer **single-parameter** expressions in rules. Multi-pa
 - [ExpressionCompiler](expressioncompiler.md) — Compiles C# expressions to delegates
 - [Delegate Types](delegate-types.md) — Supported expression signatures
 - [Rule](rule.md) — Uses `CompiledDelegate` internally for expression evaluation
-- [AOT Compatibility](aot-compatibility.md) — Notes on trimming and AOT limitations
+- [AOT Compatibility](../aot-compatibility.md) — Notes on trimming and AOT limitations

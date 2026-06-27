@@ -66,6 +66,7 @@ Expression = "awaiting > 0"  // This is sync
 
 **Fix:** Compile once before executing:
 ```csharp
+var compiler = new ExpressionCompiler();
 rule.Compile(compiler, parameters);
 var result = rule.Execute(parameters);  // Now works
 ```

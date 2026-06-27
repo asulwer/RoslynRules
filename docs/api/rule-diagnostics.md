@@ -5,7 +5,7 @@ parent: API Reference
 nav_order: 6
 ---
 
-[← Back to API Reference](api-reference.md)
+[← Back to API Reference](../api-reference.md)
 
 # RuleDiagnostics
 

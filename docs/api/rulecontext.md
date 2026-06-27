@@ -5,7 +5,7 @@ parent: API Reference
 nav_order: 11
 ---
 
-[← Back to API Reference](api-reference.md)
+[← Back to API Reference](../api-reference.md)
 
 # RuleContext
 
@@ -21,13 +21,14 @@ public class RuleContext
 
 ### `GetResult(Guid)`
 
-Gets the `RuleResult` for a specific rule ID.
+Gets the `RuleResult` for a specific rule ID. Returns `RuleResult?` (`null` if the rule has
+not executed yet).
 
 ```csharp
-var dependencyResult = context.GetResult(validateCustomer.Id);
-if (dependencyResult.Success)
+RuleResult? dependencyResult = context.GetResult(validateCustomer.Id);
+if (dependencyResult is { Success: true })
 {
-    // dependency passed
+    // dependency executed and passed
 }
 ```
 
@@ -68,20 +69,39 @@ context.StoreResult(rule.Id, result);
 
 ## Usage with DependsOnRuleId
 
+`RuleContext` is a **host-side** API. There is no `context` variable in scope inside an
+`Expression` or `Action` string — those strings may only reference declared `RuleParameter`s.
+The host code reads dependency results from the context after (or between) rule execution.
+
 ```csharp
 var taxRule = new Rule
 {
     Description = "Calculate tax",
-    Action = "customer.TaxAmount = customer.Amount * 0.08"
+    // Expressions/actions reference declared parameters only — never "context".
+    Action = "customer.TaxAmount = customer.Amount * 0.08m"
 };
 
 var totalRule = new Rule
 {
     Description = "Calculate total",
     DependsOnRuleId = taxRule.Id,
-    Expression = "context.TryGetValue<decimal>(taxRule.Id, out var tax)",
-    Action = "customer.Total = customer.Amount + tax"
+    Action = "customer.Total = customer.Amount + customer.TaxAmount"
 };
+
+// Host code inspects dependency results via RuleContext.
+var context = new RuleContext();
+// ... engine stores each rule's result into the context as it runs ...
+
+if (context.TryGetValue<decimal>(taxRule.Id, out var tax))
+{
+    Console.WriteLine($"Tax computed by dependency: {tax}");
+}
+
+RuleResult? taxResult = context.GetResult(taxRule.Id);
+if (taxResult is { Success: true })
+{
+    // proceed knowing the tax rule succeeded
+}
 ```
 
 ---

@@ -96,6 +96,7 @@ var parameters = new[]
     RuleParameter.ForCompile("quantity", typeof(int))
 };
 
+var compiler = new ExpressionCompiler();
 rule.Compile(compiler, parameters);
 ```
 

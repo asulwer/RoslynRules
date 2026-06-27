@@ -47,12 +47,14 @@ var workflow = new Workflow
         {
             Description = "Check inventory",
             Expression = "inventory.HasStock",
+            Id = Guid.Parse("22222222-2222-2222-2222-222222222222"),
             DependsOnRuleId = Guid.Parse("11111111-1111-1111-1111-111111111111")
         },
         new Rule
         {
             Description = "Apply discount",
             Expression = "order.Total > 100",
+            Id = Guid.Parse("33333333-3333-3333-3333-333333333333"),
             DependsOnRuleId = Guid.Parse("22222222-2222-2222-2222-222222222222")
         }
     }
@@ -61,7 +63,8 @@ var workflow = new Workflow
 Console.WriteLine(RuleGraphVisualizer.ToMermaid(workflow));
 ```
 
-**Output:**
+**Output (illustrative — node ids correspond to the rule ids above; the `:::inactive`
+styling is shown only to demonstrate how inactive rules render):**
 ```mermaid
 graph TD
     R11111111111111111111111111111111[Validate customer]

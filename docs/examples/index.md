@@ -174,7 +174,7 @@ var rule = new Rule
     }"
 };
 
-// Access result.Data as ValidationResult
+// Access result.Value as ValidationResult
 ```
 
 ## Workflow with Multiple Rules
@@ -204,7 +204,7 @@ var results = workflow.ExecuteParallel(parameters);
 
 ## Dependency Chaining
 
-Chain rules with `DependsOnRuleId` so downstream rules access upstream results via `RuleContext`.
+Chain rules with `DependsOnRuleId` so each upstream rule's `Action` mutates the shared parameter object and downstream rules read those mutated properties. Compiled expressions can only reference the declared parameters — there is no `context` variable inside expression strings.
 
 ```csharp
 var authId = Guid.NewGuid();
@@ -212,6 +212,7 @@ var authRule = new Rule(authId)
 {
     Description = "Authenticated?",
     Expression = "user.IsAuthenticated",
+    Action = "user.IsAuthenticated = true",
     IsActive = true
 };
 
@@ -219,7 +220,8 @@ var adminId = Guid.NewGuid();
 var adminRule = new Rule(adminId)
 {
     Description = "Admin?",
-    Expression = "context.GetValue<bool>(authId) && user.Role == \"Admin\"",
+    Expression = "user.IsAuthenticated && user.Role == \"Admin\"",
+    Action = "user.IsAdmin = user.IsAuthenticated && user.Role == \"Admin\"",
     DependsOnRuleId = authId,
     IsActive = true
 };
@@ -228,7 +230,7 @@ var discountId = Guid.NewGuid();
 var discountRule = new Rule(discountId)
 {
     Description = "VIP discount",
-    Expression = "context.GetValue<bool>(adminId) && user.IsVip",
+    Expression = "user.IsAdmin && user.IsVip",
     DependsOnRuleId = adminId,
     IsActive = true
 };
@@ -249,7 +251,8 @@ var results = workflow.Execute(new[]
 
 **Key points:**
 - `DependsOnRuleId` ensures execution order
-- `RuleContext.GetValue<T>(ruleId)` retrieves upstream results
+- Upstream rules pass data downstream by mutating the shared parameter object in their `Action`; downstream rules read the mutated properties
+- The host-side `RuleContext.GetValue<T>(ruleId)` API can inspect results from C# code, but is not available inside expression strings
 - Cyclic dependencies throw `CircularReferenceException` on `Validate()`
 
 ## Logging with Serilog
@@ -317,7 +320,7 @@ Expression = "((dynamic)customer).Age != null && ((dynamic)customer).Age >= 18"
 Store rules in JSON files for configuration-driven setups:
 
 ```csharp
-using RoslynRules.Extensions;
+using RoslynRules.Json;
 
 // Load from JSON
 var workflow = JsonRuleLoader.LoadWorkflowFromFile("customer-rules.json");
@@ -353,7 +356,7 @@ Combine rules from multiple sources into a single batch:
 
 ```csharp
 using RoslynRules.Batch;
-using RoslynRules.Extensions;
+using RoslynRules.Json;
 
 var batch = new RuleBatch();
 
@@ -365,7 +368,7 @@ batch.AddRule(new Rule
 });
 
 // From JSON file
-var jsonWorkflow = JsonRuleLoader.LoadFromFile("compliance-rules.json");
+var jsonWorkflow = JsonRuleLoader.LoadWorkflowFromFile("compliance-rules.json");
 batch.AddRules(jsonWorkflow.Rules);
 
 // From database (EF Core)
@@ -533,5 +536,5 @@ foreach (var error in errors)
 {
     Console.WriteLine($"[{error.ErrorType}] {error.Message}");
 }
-// ErrorType values: NoActiveRules, EmptyRule, SyntaxError, CircularReference, DuplicateRuleId, MissingDependency
+// ErrorType values: NoActiveRules, EmptyRule, CircularReference, SyntaxError, DuplicateRuleId, MissingDependency, General
 ```

@@ -5,7 +5,7 @@ parent: API Reference
 nav_order: 3
 ---
 
-[← Back to API Reference](api-reference.md)
+[← Back to API Reference](../api-reference.md)
 
 # RuleResult
 
@@ -34,7 +34,7 @@ public readonly record struct RuleResult
 | `Exception` | `Exception?` | Exception if execution failed |
 | `ChildResults` | `IReadOnlyList<RuleResult>` | Nested results from child rules |
 | `FirstFailure` | `RuleResult?` | First failing child (or `null` if all passed) |
-| `AllFailures` | `IEnumerable<RuleResult>` | All failing children (recursive) |
+| `AllFailures` | `IEnumerable<RuleResult>` | Direct failing children (not recursive) |
 
 ---
 
@@ -78,4 +78,4 @@ foreach (var child in result.ChildResults)
 ## Related
 
 - [Rule](rule.md) — Produces RuleResult
-- [RuleTest](rule-test.md) — Testing framework assertions
+- [Testing Framework](../examples/testing-framework.md) — Testing framework assertions

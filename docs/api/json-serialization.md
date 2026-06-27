@@ -5,7 +5,7 @@ parent: API Reference
 nav_order: 8
 ---
 
-[← Back to API Reference](api-reference.md)
+[← Back to API Reference](../api-reference.md)
 
 # JSON Serialization
 
@@ -67,15 +67,6 @@ JsonRuleLoader.SaveWorkflowToFile(workflow, "rules.json");
 Custom `JsonSerializerOptions` with camelCase naming and indented output.
 
 ```csharp
-
----
-
-## Related
-
-- [Rule](rule.md) — Serialized model
-- [Workflow](workflow.md) — Serialized container
-- [Rule Templates](rule-templates.md) — Serialize templates before instantiation
-
 var options = new JsonSerializerOptions
 {
     PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -89,9 +80,10 @@ var json = JsonRuleLoader.Serialize(workflow, options);
 
 ---
 
-## See Also
+## Related
 
-- [Getting Started](getting-started.md)
-- [API Reference: Workflow](workflow.md)
-- [API Reference: Rule](rule.md)
+- [Rule](rule.md) — Serialized model
+- [Workflow](workflow.md) — Serialized container
+- [Rule Templates](rule-templates.md) — Serialize templates before instantiation
+- [Getting Started](../getting-started.md)
 - [NuGet Package](https://www.nuget.org/packages/RoslynRules.Json)

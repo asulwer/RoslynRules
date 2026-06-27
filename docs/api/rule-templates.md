@@ -5,7 +5,7 @@ parent: API Reference
 nav_order: 9
 ---
 
-[← Back to API Reference](api-reference.md)
+[← Back to API Reference](../api-reference.md)
 
 # Rule Templates
 
@@ -34,9 +34,11 @@ public class RuleTemplate
 
 ### Methods
 
-#### `Instantiate(Dictionary<string, object>, ExpressionCompiler, RuleParameter[], string[]?)`
+#### `Instantiate(Dictionary<string, object>, ExpressionCompiler, RuleParameter[], string[], AssemblyReferenceProvider?)`
 
-Creates a compiled `Rule` from the template with placeholder values substituted.
+Creates a compiled `Rule` from the template with placeholder values substituted. The trailing
+`AssemblyReferenceProvider? referenceProvider = null` argument is optional and controls
+compilation sandboxing.
 
 ```csharp
 var template = new RuleTemplate
@@ -50,12 +52,18 @@ var values = new Dictionary<string, object> { ["minAge"] = 18 };
 var rule = template.Instantiate(values, compiler, parameters, Array.Empty<string>());
 ```
 
-#### `ExtractPlaceholders(string)`
+#### `ExtractPlaceholders()`
 
-Extracts placeholder names from an expression string.
+Instance method that extracts placeholder names from this template's `Expression` (no
+parameters). Returns `IReadOnlyList<string>`.
 
 ```csharp
-var names = RuleTemplate.ExtractPlaceholders("customer.Age >= {minAge} && customer.Score >= {minScore}");
+var template = new RuleTemplate
+{
+    Expression = "customer.Age >= {minAge} && customer.Score >= {minScore}"
+};
+
+IReadOnlyList<string> names = template.ExtractPlaceholders();
 // ["minAge", "minScore"]
 ```
 

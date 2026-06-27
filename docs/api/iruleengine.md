@@ -5,7 +5,7 @@ parent: API Reference
 nav_order: 12
 ---
 
-[← Back to API Reference](api-reference.md)
+[← Back to API Reference](../api-reference.md)
 
 # IRuleEngine
 
@@ -46,7 +46,7 @@ services.AddSingleton<IRuleEngine, RuleBatch>();
 ```csharp
 var mock = new Mock<IRuleEngine>();
 mock.Setup(x => x.Execute(It.IsAny<RuleParameter[]>()))
-    .Returns(new[] { new RuleResult { Success = true } });
+    .Returns(new[] { new RuleResult(true) });
 
 var service = new MyService(mock.Object);
 ```
