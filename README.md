@@ -50,15 +50,12 @@ var results = workflow.Execute(new RuleParameter("customer", typeof(Customer), c
 
 ## Quick start
 
-### 1. Create a compiler
+> **Rules live inside a workflow.** You author `Rule` objects on their own, but a
+> rule is not an executable unit by itself — you wrap your rules in a `Workflow`,
+> and the workflow compiles and executes them. You never compile or run a rule
+> directly; the workflow owns the compiler and drives execution.
 
-```csharp
-using RoslynRules.Compiler;
-
-var compiler = new ExpressionCompiler();
-```
-
-### 2. Define your model
+### 1. Define your model
 
 ```csharp
 public class Customer
@@ -69,7 +66,7 @@ public class Customer
 }
 ```
 
-### 3. Create and compile a rule
+### 2. Author your rules
 
 ```csharp
 using RoslynRules.Models;
@@ -80,41 +77,32 @@ var rule = new Rule
     Expression = "customer.Age >= 18",
     Action = "customer.Processed = true"
 };
-
-// Compile parameter (type-only, no value needed for compilation)
-var compileParam = new RuleParameter("customer", typeof(Customer));
-
-// Compile the rule
-rule.Compile(compiler, new[] { compileParam });
-
-// Execute with a value
-var adult = new Customer { Name = "Alice", Age = 25 };
-var param = new RuleParameter("customer", typeof(Customer), adult);
-var result = rule.Execute(param);
-Console.WriteLine(result.Success); // True
 ```
 
-### 4. Compile a workflow
+### 3. Wrap the rules in a workflow
 
 ```csharp
 var workflow = new Workflow
 {
-    Rules =
-    {
-        new Rule
-        {
-            Description = "Adult customer",
-            Expression = "customer.Age >= 18",
-            Action = "customer.Processed = true"
-        }
-    }
+    Rules = { rule }
 };
+```
 
-// Workflow owns its own compiler — pass parameters only (no compiler argument)
+### 4. Compile and execute the workflow
+
+```csharp
+// Compile parameter (type-only, no value needed for compilation).
+// The workflow owns its own compiler — pass parameters only, no compiler argument.
+var compileParam = new RuleParameter("customer", typeof(Customer));
 workflow.Compile(new[] { compileParam });
 
 // Execute with real data
-var results = workflow.Execute(new[] { param });
+var adult = new Customer { Name = "Alice", Age = 25 };
+var param = new RuleParameter("customer", typeof(Customer), adult);
+var results = workflow.Execute(param);
+
+foreach (var result in results)
+    Console.WriteLine(result.Success); // True
 ```
 
 ### Or load rules from JSON
@@ -149,14 +137,21 @@ var results = workflow.Execute(param);
 
 ## Multi-Parameter Rules
 
-Rules can accept multiple parameters directly — no wrapper struct needed.
+Rules can accept multiple parameters directly — no wrapper struct needed. As always,
+wrap the rule in a workflow and let the workflow compile and execute it.
 
 ```csharp
-var rule = new Rule
+var workflow = new Workflow
 {
-    Description = "Price check",
-    Expression = "price > 0 && quantity > 0",
-    IsActive = true
+    Rules =
+    {
+        new Rule
+        {
+            Description = "Price check",
+            Expression = "price > 0 && quantity > 0",
+            IsActive = true
+        }
+    }
 };
 
 var compileParams = new[]
@@ -165,9 +160,9 @@ var compileParams = new[]
     new RuleParameter("quantity", typeof(int))
 };
 
-rule.Compile(compiler, compileParams);
+workflow.Compile(compileParams);
 
-var result = rule.Execute(new[]
+var results = workflow.Execute(new[]
 {
     new RuleParameter("price", typeof(decimal), 9.99m),
     new RuleParameter("quantity", typeof(int), 5)

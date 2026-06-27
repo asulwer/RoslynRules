@@ -50,9 +50,13 @@ var whitelist = new[] { "MyApp.Domain", "MyApp.Services" };
 var blocked = new[] { "System.IO" }; // extra blocks beyond defaults
 var provider = new AssemblyReferenceProvider(whitelist, blocked);
 
-var compiler = new ExpressionCompiler(referenceProvider: provider);
-var rule = new Rule { Expression = "MyApp.Domain.IsValid(data)" };
-rule.Compile(compiler, parameters);
+var workflow = new Workflow
+{
+    Rules = { new Rule { Expression = "MyApp.Domain.IsValid(data)" } }
+};
+
+// The workflow owns its compiler — pass the custom provider to Compile.
+workflow.Compile(parameters, referenceProvider: provider);
 ```
 
 > ⚠️ **Important:** Sandboxing prevents accidental access but is not a complete security boundary. Determined attackers with deep .NET knowledge may still find escape routes. Combine sandboxing with the other mitigations below.

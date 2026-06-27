@@ -43,7 +43,9 @@ public readonly record struct RuleResult
 ### Basic Check
 
 ```csharp
-var result = rule.Execute(parameters);
+var workflow = new Workflow { Rules = { rule } };
+workflow.Compile(parameters);
+var result = workflow.Execute(parameters).First();
 if (!result.Success)
     Console.WriteLine($"Failed: {result.RuleDescription}");
 ```

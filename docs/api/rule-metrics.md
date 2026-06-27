@@ -35,12 +35,13 @@ var rule = new Rule
 };
 
 var parameters = new[] { new RuleParameter("customer", typeof(Customer), customer) };
-rule.Compile(new ExpressionCompiler(), parameters);
+var workflow = new Workflow { Rules = { rule } };
+workflow.Compile(parameters);
 
 // Execute multiple times
-rule.Execute(parameters);
-rule.Execute(parameters);
-rule.Execute(parameters);
+workflow.Execute(parameters);
+workflow.Execute(parameters);
+workflow.Execute(parameters);
 
 // Check metrics
 Console.WriteLine($"Evaluated: {rule.Metrics.EvalCount} times");
@@ -54,7 +55,7 @@ Console.WriteLine($"Last run: {rule.Metrics.LastExecuted}");
 Metrics update via lock-free `Interlocked` operations. Safe for concurrent execution:
 
 ```csharp
-Parallel.For(0, 1000, _ => rule.Execute(parameters));
+Parallel.For(0, 1000, _ => workflow.Execute(parameters).ToList());
 
 Console.WriteLine(rule.Metrics.EvalCount); // 1000
 ```
@@ -67,9 +68,11 @@ A "failure" is either:
 
 ```csharp
 var badRule = new Rule { Expression = "x > 0" };
-badRule.Compile(compiler, new[] { new RuleParameter("x", typeof(int), -1) });
+var parameters = new[] { new RuleParameter("x", typeof(int), -1) };
+var workflow = new Workflow { Rules = { badRule } };
+workflow.Compile(parameters);
 
-badRule.Execute(parameters); // fails: -1 > 0 is false
+workflow.Execute(parameters); // fails: -1 > 0 is false
 Console.WriteLine(badRule.Metrics.FailureRatePercent); // 100
 ```
 

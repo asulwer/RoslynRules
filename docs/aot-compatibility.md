@@ -17,9 +17,9 @@ RoslynRules supports AOT deployment via **pre-compiled snapshots**. Rules cannot
 |-----------|----------|----------|
 | Load rules from JSON/EF | ✅ Yes | ✅ Yes |
 | `Workflow.Validate()` | ✅ Yes | ✅ Yes |
-| `Rule.Compile()` (from string) | ✅ Yes | ❌ **Not supported** |
-| `Rule.Execute()` without snapshot | ✅ Yes | ❌ Throws error |
-| `Rule.Execute()` with snapshot | ✅ Yes | ✅ Yes |
+| `Workflow.Compile()` (from string) | ✅ Yes | ❌ **Not supported** |
+| `Workflow.Execute()` without snapshot | ✅ Yes | ❌ Throws error |
+| `Workflow.Execute()` with snapshot | ✅ Yes | ✅ Yes |
 | Create snapshots | ✅ Yes | ❌ **Not supported** |
 | Load snapshots | ✅ Yes | ✅ Yes |
 
@@ -159,9 +159,8 @@ These work in AOT without snapshots:
 
 These **require** snapshots in AOT:
 
-- `Rule.Execute()`
 - `Workflow.Execute()`
-- `Rule.Compile()`
+- `Workflow.Compile()`
 - `ExpressionCompiler`
 
 ---

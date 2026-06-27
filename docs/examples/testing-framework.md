@@ -69,7 +69,9 @@ Use fluent assertions directly on `RuleResult` for concise test code.
 ### Success and Failure
 
 ```csharp
-var result = rule.Execute(parameters);
+var workflow = new Workflow { Rules = { rule } };
+workflow.Compile(parameters);
+var result = workflow.Execute(parameters).First();
 
 // Assert success
 result.ShouldPass();
@@ -84,7 +86,9 @@ result.ShouldBeInactive();
 ### Value Assertions
 
 ```csharp
-var result = rule.Execute(parameters);
+var workflow = new Workflow { Rules = { rule } };
+workflow.Compile(parameters);
+var result = workflow.Execute(parameters).First();
 
 // Assert specific value
 result.ShouldHaveValue(42);
@@ -108,9 +112,9 @@ var parent = new Rule
     }
 };
 
-var compiler = new ExpressionCompiler();
-parent.Compile(compiler, parameters);
-var result = parent.Execute(parameters);
+var workflow = new Workflow { Rules = { parent } };
+workflow.Compile(parameters);
+var result = workflow.Execute(parameters).First();
 
 // All children passed
 result.ShouldHaveAllChildrenPass();
@@ -135,9 +139,9 @@ var badRule = new Rule
     Expression = "throw new ArgumentException(\"test\")"
 };
 
-var compiler = new ExpressionCompiler();
-badRule.Compile(compiler, parameters);
-var result = badRule.Execute(parameters);
+var workflow = new Workflow { Rules = { badRule } };
+workflow.Compile(parameters);
+var result = workflow.Execute(parameters).First();
 
 // Assert exception type
 result.ShouldHaveThrown<ArgumentException>();
@@ -357,9 +361,9 @@ public void AdultRule_WithAdultCustomer_ShouldPass()
         new RuleParameter("customer", typeof(Customer), new Customer { Age = 25 })
     };
 
-    var compiler = new ExpressionCompiler();
-    rule.Compile(compiler, parameters);
-    var result = rule.Execute(parameters);
+    var workflow = new Workflow { Rules = { rule } };
+    workflow.Compile(parameters);
+    var result = workflow.Execute(parameters).First();
 
     // Framework assertions
     result.ShouldPass();
@@ -377,7 +381,9 @@ public void AdultRule_WithAdultCustomer_ShouldPass()
 [Fact]
 public void ComplexRule_ShouldBehaveCorrectly()
 {
-    var result = rule.Execute(parameters);
+    var workflow = new Workflow { Rules = { rule } };
+    workflow.Compile(parameters);
+    var result = workflow.Execute(parameters).First();
     
     // Built-in assertions for common checks
     result.ShouldPass();
@@ -399,36 +405,36 @@ public void ComplexRule_ShouldBehaveCorrectly()
 ```csharp
 public class AgeRuleTests
 {
-    private readonly Rule _rule;
+    private readonly Workflow _workflow;
     private readonly RuleParameter[] _parameters;
 
     public AgeRuleTests()
     {
-        _rule = new Rule
+        var rule = new Rule
         {
             Description = "Age check",
             Expression = "customer.Age >= 18",
             IsActive = true
         };
         _parameters = new[] { new RuleParameter("customer", typeof(Customer), default) };
-        var compiler = new ExpressionCompiler();
-        _rule.Compile(compiler, _parameters);
+        _workflow = new Workflow { Rules = { rule } };
+        _workflow.Compile(_parameters);
     }
 
     [Fact]
     public void WithAdult_ShouldPass() =>
-        _rule.Execute(new[] { new RuleParameter("customer", typeof(Customer), new Customer { Age = 25 }) })
-            .ShouldPass();
+        _workflow.Execute(new[] { new RuleParameter("customer", typeof(Customer), new Customer { Age = 25 }) })
+            .First().ShouldPass();
 
     [Fact]
     public void WithMinor_ShouldFail() =>
-        _rule.Execute(new[] { new RuleParameter("customer", typeof(Customer), new Customer { Age = 16 }) })
-            .ShouldFail();
+        _workflow.Execute(new[] { new RuleParameter("customer", typeof(Customer), new Customer { Age = 16 }) })
+            .First().ShouldFail();
 
     [Fact]
     public void WithBoundary_ShouldPass() =>
-        _rule.Execute(new[] { new RuleParameter("customer", typeof(Customer), new Customer { Age = 18 }) })
-            .ShouldPass();
+        _workflow.Execute(new[] { new RuleParameter("customer", typeof(Customer), new Customer { Age = 18 }) })
+            .First().ShouldPass();
 }
 ```
 
@@ -458,9 +464,9 @@ public void AllValidationRules_ShouldPassWithValidCustomer()
 public void Rule_ShouldCompileSuccessfully()
 {
     var rule = new Rule { Expression = "customer.Age >= 18" };
-    var compiler = new ExpressionCompiler();
+    var workflow = new Workflow { Rules = { rule } };
 
-    var act = () => rule.Compile(compiler, parameters);
+    var act = () => workflow.Compile(parameters);
     act.Should().NotThrow();
 }
 
@@ -468,9 +474,9 @@ public void Rule_ShouldCompileSuccessfully()
 public void Rule_WithSyntaxError_ShouldThrow()
 {
     var rule = new Rule { Expression = "customer.Age >= " }; // Syntax error
-    var compiler = new ExpressionCompiler();
+    var workflow = new Workflow { Rules = { rule } };
 
-    var act = () => rule.Compile(compiler, parameters);
+    var act = () => workflow.Compile(parameters);
     act.Should().Throw<InvalidOperationException>();
 }
 ```

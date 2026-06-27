@@ -20,6 +20,13 @@ public sealed class Rule
 - Properties become **immutable after `Compile()`** — modification throws `RuleCompilationException`
 - Supports both **sync** and **async** expressions (auto-detected via `await`)
 
+> **A rule lives inside a workflow.** You author `Rule` objects on their own, but a
+> rule is not a standalone execution unit — wrap your rules in a [`Workflow`](workflow.md),
+> which owns the compiler and drives compilation and execution. The `Compile` and
+> `Execute` methods below are the per-rule machinery the workflow invokes for each of
+> its rules; call `Workflow.Compile()` / `Workflow.Execute()` rather than driving
+> individual rules yourself.
+
 ---
 
 ## Properties

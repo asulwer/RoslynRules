@@ -209,8 +209,9 @@ var result = compiled.Invoke(new[]
 
 > **Note:** `CompiledDelegate`, its wrappers, and `CompiledDelegateFactory` are `internal`.
 > They are not part of the public API; the snippet below is conceptual and illustrates how the
-> engine wraps a delegate internally. Application code should call `Rule.Compile(...)` /
-> `Rule.Execute(...)` instead of constructing these types directly.
+> engine wraps a delegate internally. Application code should compile and execute rules through a
+> `Workflow` (`Workflow.Compile(...)` / `Workflow.Execute(...)`) instead of constructing these
+> types directly.
 
 `ExpressionCompiler.Compile<TDelegate>` is generic and takes the parameter **names** as a
 `string[]` (not a `RuleParameter[]`). For a single-parameter `Customer` expression:
