@@ -112,19 +112,21 @@ var rule = new Rule
     Expression = "name.Length > 0 && age >= 18"
 };
 
-rule.Compile(compiler, parameters);
-var result = rule.Execute(parameters);
+var workflow = new Workflow { Rules = { rule } };
+workflow.Compile(parameters);
+var result = workflow.Execute(parameters).First();
 ```
 
 **Parameter names in expressions** must match exactly:
 
 ```csharp
 // Expression uses the parameter names directly
-new Rule { Expression = "x > y" }
-    .Compile(compiler, new[] {
-        new RuleParameter("x", typeof(int), 10),
-        new RuleParameter("y", typeof(int), 5)
-    });
+var rule = new Rule { Expression = "x > y" };
+var workflow = new Workflow { Rules = { rule } };
+workflow.Compile(new[] {
+    new RuleParameter("x", typeof(int), 10),
+    new RuleParameter("y", typeof(int), 5)
+});
 ```
 
 **Limitations:**

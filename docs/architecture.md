@@ -56,7 +56,8 @@ This catches:
 
 ### 3. Full Compilation
 
-When you call `Rule.Compile()`, RoslynRules:
+When you call `Workflow.Compile()`, the workflow compiles each of its rules. For every
+rule, RoslynRules:
 
 1. **Builds a delegate signature** from your parameter types:
    - 1-16 parameters → `Func<T1,...,T16,TReturn>` or `Action<T1,...,T16>`

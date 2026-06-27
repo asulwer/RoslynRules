@@ -84,7 +84,9 @@ var french = rule.GetLocalizedDescription("fr-FR"); // Specific culture
 ### 4. Execution results include localized descriptions
 
 ```csharp
-var result = rule.Execute(parameters);
+var workflow = new Workflow { Rules = { rule } };
+workflow.Compile(parameters);
+var result = workflow.Execute(parameters).First();
 Console.WriteLine(result.RuleDescription); // "Vérification adulte" (if fr-FR)
 ```
 

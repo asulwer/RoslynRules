@@ -11,11 +11,16 @@ nav_order: 10
 
 Choose the right tool for your rules evaluation scenario.
 
+> **Rules are never compiled or executed on their own.** A `Rule` is authored
+> independently, but it must be wrapped in a container that owns compilation and
+> execution — a `Workflow` (the default) or a `RuleBatch` for large, independent
+> rule sets. Even a single rule runs inside a workflow.
+
 ## Decision Matrix
 
 | Scenario | Use | Not | Why |
 |----------|-----|-----|-----|
-| Single boolean check | `Rule` | `Workflow` | No overhead of workflow |
+| Single boolean check | `Workflow` (one rule) | `RuleBatch` | Smallest container that compiles and runs a rule |
 | 2-5 related checks | `Workflow` | `RuleBatch` | Grouped logic, shared compilation |
 | 10+ independent checks | `RuleBatch` | `Workflow` | Shared compile, parallel eval |
 | Need streaming results | `Workflow.ExecuteAsync` | `Workflow.Execute` | Memory efficient |
@@ -28,22 +33,28 @@ Choose the right tool for your rules evaluation scenario.
 | Real-time progress | `ExecuteAsync` | `Execute` | Yield results as ready |
 | Batch processing | `ExecuteBufferedAsync` | `Execute` | Fixed memory footprint |
 
-## Individual Rule
+## Single-Rule Workflow
 
-Use when you have a single, standalone condition.
+Use when you have a single, standalone condition. The rule still lives inside a
+workflow — the workflow compiles and executes it.
 
 ```csharp
 // Simple validation
-var ageCheck = new Rule
+var workflow = new Workflow
 {
-    Description = "Age check",
-    Expression = "customer.Age >= 18",
-    IsActive = true
+    Rules = new List<Rule>
+    {
+        new Rule
+        {
+            Description = "Age check",
+            Expression = "customer.Age >= 18",
+            IsActive = true
+        }
+    }
 };
 
-var compiler = new ExpressionCompiler();
-ageCheck.Compile(compiler, parameters);
-var result = ageCheck.Execute(parameters);
+workflow.Compile(parameters);
+var result = workflow.Execute(parameters).First();
 
 // result.Success tells you pass/fail
 ```
@@ -51,11 +62,10 @@ var result = ageCheck.Execute(parameters);
 **When to use:**
 - One-off validations
 - Simple boolean checks
-- Testing expressions before adding to workflow
+- A single condition that may later grow into a multi-rule workflow
 
 **When NOT to use:**
-- Multiple related checks (use Workflow)
-- Need parallel evaluation (use RuleBatch)
+- Many independent checks from multiple sources (use RuleBatch)
 
 ## Workflow
 
@@ -202,7 +212,7 @@ await foreach (var chunk in workflow.ExecuteBufferedAsync(parameters, bufferSize
 
 | Count | Recommended | Execution |
 |-------|-------------|-----------|
-| 1 | `Rule` | `Execute()` |
+| 1 | `Workflow` (one rule) | `Execute()` |
 | 2-5 | `Workflow` | `Execute()` |
 | 5-20 | `Workflow` | `ExecuteParallel()` |
 | 20-100 | `Workflow` or `RuleBatch` | `ExecuteParallel()` or `ExecuteAsync()` |

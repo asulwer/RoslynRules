@@ -62,13 +62,13 @@ Expression = "awaiting > 0"  // This is sync
 
 ### "Rule has not been compiled"
 
-**Cause:** `Execute()` called before `Compile()`.
+**Cause:** `Execute()` called before `Compile()`. A rule is not a standalone execution unit — wrap it in a `Workflow` and compile the workflow before executing it.
 
-**Fix:** Compile once before executing:
+**Fix:** Compile the workflow once before executing:
 ```csharp
-var compiler = new ExpressionCompiler();
-rule.Compile(compiler, parameters);
-var result = rule.Execute(parameters);  // Now works
+var workflow = new Workflow { Rules = { rule } };
+workflow.Compile(parameters);
+var result = workflow.Execute(parameters).First();  // Now works
 ```
 
 ---
@@ -94,7 +94,9 @@ Expression = "customer?.Age >= 18 ?? false"
 
 **Debug:**
 ```csharp
-var result = rule.Execute(parameters);
+var workflow = new Workflow { Rules = { rule } };
+workflow.Compile(parameters);
+var result = workflow.Execute(parameters).First();
 Console.WriteLine(result.Value);  // The actual boolean result
 ```
 

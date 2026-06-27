@@ -70,7 +70,9 @@ var text = rule.GetLocalizedDescription("fr-FR");
 // "Vérification adulte"
 
 // Execute — result uses localized description
-var result = rule.Execute(parameters);
+var workflow = new Workflow { Rules = { rule } };
+workflow.Compile(parameters);
+var result = workflow.Execute(parameters).First();
 Console.WriteLine(result.RuleDescription);
 // "Vérification adulte"
 ```

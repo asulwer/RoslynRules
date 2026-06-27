@@ -112,10 +112,10 @@ var parameters = new[]
     new RuleParameter("quantity", typeof(int), 5)
 };
 
-var compiler = new ExpressionCompiler();
-rule.Compile(compiler, parameters);
+var workflow = new Workflow { Rules = { rule } };
+workflow.Compile(parameters);
 
-var result = rule.Execute(parameters);
+var result = workflow.Execute(parameters).First();
 // result.Success = true
 ```
 
@@ -133,8 +133,9 @@ var parameters = new[]
     new RuleParameter("y", typeof(int), 5)
 };
 
-rule.Compile(compiler, parameters);
-rule.Execute(parameters); // Success = true
+var workflow = new Workflow { Rules = { rule } };
+workflow.Compile(parameters);
+workflow.Execute(parameters); // first result Success = true
 ```
 
 ## Async Rule
@@ -303,10 +304,10 @@ var rule = new Rule
     IsActive = true
 };
 
-var compiler = new ExpressionCompiler();
-rule.Compile(compiler, parameters, new[] { "System.Dynamic" });
+var workflow = new Workflow { Rules = { rule } };
+workflow.Compile(parameters, new[] { "System.Dynamic" });
 
-var result = rule.Execute(parameters);
+var result = workflow.Execute(parameters).First();
 // result.Success = true
 ```
 

@@ -33,7 +33,11 @@ public class Customer
 }
 ```
 
-### 2. Create a Rule
+### 2. Author a Rule
+
+A `Rule` is authored on its own, but it is not an executable unit by itself. You never
+compile or run a rule directly — it must be wrapped in a workflow, which owns the
+compiler and drives execution.
 
 ```csharp
 using RoslynRules.Models;
@@ -47,7 +51,9 @@ var adultRule = new Rule
 };
 ```
 
-### 3. Create a Workflow
+### 3. Wrap the Rule in a Workflow
+
+The workflow is the unit that compiles and executes rules.
 
 ```csharp
 var workflow = new Workflow
@@ -81,13 +87,20 @@ var executeParams = new[]
 
 ### Multiple Parameters
 
-Rules can accept multiple parameters directly — up to 16.
+Rules can accept multiple parameters directly — up to 16. Wrap the rule in a
+workflow and let the workflow compile it.
 
 ```csharp
-var rule = new Rule
+var workflow = new Workflow
 {
-    Description = "Price validation",
-    Expression = "price > 0 && quantity > 0"
+    Rules = new List<Rule>
+    {
+        new Rule
+        {
+            Description = "Price validation",
+            Expression = "price > 0 && quantity > 0"
+        }
+    }
 };
 
 var parameters = new[]
@@ -96,8 +109,7 @@ var parameters = new[]
     RuleParameter.ForCompile("quantity", typeof(int))
 };
 
-var compiler = new ExpressionCompiler();
-rule.Compile(compiler, parameters);
+workflow.Compile(parameters);
 ```
 
 ### 5. Validate, Compile, Execute
