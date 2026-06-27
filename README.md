@@ -30,8 +30,12 @@ var workflow = new Workflow
     }
 };
 
-workflow.Compile(parameters);
-var results = workflow.Execute(parameters);
+// Compile with type-only parameters (no values needed at compile time)
+workflow.Compile(new[] { new RuleParameter("customer", typeof(Customer)) });
+
+// Execute with real data
+var customer = new Customer { Age = 25 };
+var results = workflow.Execute(new RuleParameter("customer", typeof(Customer), customer));
 ```
 
 | Instead of... | RoslynRules does... |
@@ -185,7 +189,7 @@ JIT-only APIs throw `AotCompatibilityException` when called in AOT/trimming mode
 ```csharp
 // This throws in AOT — compile in JIT instead
 try {
-    workflow.Compile(parameters);
+    workflow.Compile(new[] { new RuleParameter("customer", typeof(Customer)) });
 }
 catch (AotCompatibilityException ex) {
     // Message: "'Workflow.Compile' is not available in AOT/trimming mode..."
