@@ -41,7 +41,8 @@ var ageCheck = new Rule
     IsActive = true
 };
 
-ageCheck.Compile(parameters);
+var compiler = new ExpressionCompiler();
+ageCheck.Compile(compiler, parameters);
 var result = ageCheck.Execute(parameters);
 
 // result.Success tells you pass/fail
@@ -67,7 +68,7 @@ var workflow = new Workflow
     Rules = new List<Rule>
     {
         new Rule { Description = "Age", Expression = "customer.Age >= 18" },
-        new Rule { Description = "Email", Expression = "customer.Email.Contains("@")" },
+        new Rule { Description = "Email", Expression = "customer.Email.Contains(\"@\")" },
         new Rule { Description = "Country", Expression = "customer.Country != null" }
     }
 };

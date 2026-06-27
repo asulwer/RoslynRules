@@ -5,7 +5,7 @@ parent: API Reference
 nav_order: 10
 ---
 
-[← Back to API Reference](api-reference.md)
+[← Back to API Reference](../api-reference.md)
 
 # Rule Predicates
 
@@ -19,34 +19,61 @@ using RoslynRules.Predicates;
 
 ## Available Predicates
 
+All methods are `static` and return a `Rule`. Every method accepts an optional trailing
+`string? description = null` argument (omitted below for brevity). The `path` argument is a
+parameter name and may be a dotted member-access path (e.g. `"order.CustomerId"`).
+
+### Null / Empty Checks
+
 | Predicate | Description |
 |-----------|-------------|
 | `IsNotNull(path)` | Value is not null |
-| `IsNull(path)` | Value is null |
-| `Equals(path, value)` | Equality comparison |
-| `NotEquals(path, value)` | Inequality comparison |
-| `GreaterThan(path, value)` | `>` comparison |
-| `GreaterThanOrEqual(path, value)` | `>=` comparison |
-| `LessThan(path, value)` | `<` comparison |
-| `LessThanOrEqual(path, value)` | `<=` comparison |
-| `Between(path, min, max)` | Inclusive range check |
+| `IsNotNullOrEmpty(path)` | String is not null or empty |
+| `IsNotNullOrWhiteSpace(path)` | String is not null or whitespace |
+| `IsNotEmpty(path)` | Collection has any elements (`.Any()`) |
+| `IsEmpty(path)` | Collection has no elements (`!.Any()`) |
+
+### Comparison
+
+| Predicate | Description |
+|-----------|-------------|
+| `GreaterThan<T>(path, value)` | `>` comparison (`T : struct`) |
+| `GreaterThanOrEqual<T>(path, value)` | `>=` comparison (`T : struct`) |
+| `LessThan<T>(path, value)` | `<` comparison (`T : struct`) |
+| `LessThanOrEqual<T>(path, value)` | `<=` comparison (`T : struct`) |
+| `Equals<T>(path, value)` | `==` comparison |
+| `NotEquals<T>(path, value)` | `!=` comparison |
+| `InRange<T>(path, min, max)` | Inclusive range check (`T : struct`) |
+| `NotInRange<T>(path, min, max)` | Outside exclusive range (`T : struct`) |
+
+### String
+
+| Predicate | Description |
+|-----------|-------------|
 | `MatchesRegex(path, pattern)` | Regex match |
-| `Contains(path, value)` | String/collection contains |
+| `Contains(path, value)` | String contains substring |
 | `StartsWith(path, value)` | String prefix |
 | `EndsWith(path, value)` | String suffix |
-| `IsEmpty(path)` | String/collection empty |
-| `IsNotEmpty(path)` | String/collection not empty |
-| `HasLength(path, min, max)` | Length in range |
-| `IsIn(path, values)` | Value in set |
-| `IsNotIn(path, values)` | Value not in set |
-| `IsTrue(path)` | Boolean true |
-| `IsFalse(path)` | Boolean false |
-| `IsDateBefore(path, date)` | Date comparison |
-| `IsDateAfter(path, date)` | Date comparison |
-| `IsDateBetween(path, start, end)` | Date range |
-| `IsGuid(path)` | Valid GUID format |
-| `IsEmail(path)` | Valid email format |
-| `IsUrl(path)` | Valid URL format |
+| `HasLength(path, length)` | String has exact length |
+| `HasMinLength(path, minLength)` | String length `>=` minLength |
+| `HasMaxLength(path, maxLength)` | String length `<=` maxLength |
+
+### Collection
+
+| Predicate | Description |
+|-----------|-------------|
+| `CountEquals(path, count)` | Collection count `==` count |
+| `CountGreaterThan(path, count)` | Collection count `>` count |
+| `CountLessThan(path, count)` | Collection count `<` count |
+| `Contains<T>(path, value)` | Collection contains element |
+
+### Boolean / Type
+
+| Predicate | Description |
+|-----------|-------------|
+| `IsTrue(path)` | Boolean is true |
+| `IsFalse(path)` | Boolean is false |
+| `IsOfType<T>(path)` | Value is of type `T` |
 
 ---
 
@@ -60,7 +87,8 @@ var workflow = new Workflow
         RulePredicates.IsNotNull("customer"),
         RulePredicates.GreaterThan("customer.Age", 18),
         RulePredicates.MatchesRegex("customer.Email", @"^[^@]+@[^@]+\.[^@]+$"),
-        RulePredicates.IsIn("customer.Status", new[] { "Active", "Pending" })
+        RulePredicates.InRange("customer.Score", 0, 100),
+        RulePredicates.HasMinLength("customer.Name", 2)
     }
 };
 ```

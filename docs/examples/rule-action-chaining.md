@@ -85,7 +85,7 @@ var checkCredit = new Rule
 1. Validate customer
 2. Check credit (only after validate customer completes)
 
-**Failure behavior:** If validate customer fails, check credit still runs. Check credit can use `RuleContext` to see the dependency's result and decide what to do.
+**Failure behavior:** If validate customer fails, check credit still runs. The upstream rule's `Action` can mutate the shared parameter object, and check credit reads those mutated properties in its `Expression`/`Action`.
 
 ### Comparison Table
 
@@ -172,8 +172,8 @@ var finalDecision = new Rule
 {
     Description = "Final decision",
     DependsOnRuleId = evaluateRisk.Id,
-    Expression = "true",
-    Action = "customer.Approved = context.GetResult(evaluateRisk.Id).Success",
+    Expression = "customer.CreditScore >= 600",
+    Action = "customer.Approved = true",
     IsActive = true
 };
 
@@ -192,9 +192,11 @@ var results = workflow.Execute(parameters).ToList();
 
 ## Accessing Dependency Results
 
-Use `RuleContext` to read the results of previously executed rules.
+To pass data between dependent rules, have the upstream rule's `Action` mutate the shared parameter object, and have the downstream rule read those mutated properties in its `Expression`/`Action`. Compiled expressions and actions can only reference the declared `RuleParameter` objects — there is no `context` variable in scope inside an expression string.
 
-### RuleContext API
+`RuleContext` is a host-side (C#) API for inspecting results after execution. Its `GetResult`/`GetValue`/`TryGetValue` methods can only be called from your own C# code, never from inside an expression or action string.
+
+### RuleContext API (host-side only)
 
 ```csharp
 public class RuleContext
@@ -219,14 +221,16 @@ public class RuleContext
 }
 ```
 
-### Reading Values in Expressions
+### Passing Values Between Rules
+
+The upstream rule mutates a property on the shared parameter object; the downstream rule reads it.
 
 ```csharp
 var calculateTax = new Rule
 {
     Description = "Calculate tax",
-    Expression = "true",
-    Action = "customer.TaxAmount = customer.Amount * 0.08",
+    Expression = "customer.Amount > 0",
+    Action = "customer.TaxAmount = customer.Amount * 0.08m",
     IsActive = true
 };
 
@@ -234,13 +238,15 @@ var calculateTotal = new Rule
 {
     Description = "Calculate total",
     DependsOnRuleId = calculateTax.Id,
-    Expression = "true",
-    Action = @"customer.Total = customer.Amount + context.GetValue<decimal>(calculateTax.Id)",
+    Expression = "customer.TaxAmount > 0",
+    Action = "customer.Total = customer.Amount + customer.TaxAmount",
     IsActive = true
 };
 ```
 
-### Using TryGetValue for Safe Access
+### Guarding Against Unset Values
+
+If the upstream rule may not have set a value, guard the downstream read against the property's default.
 
 ```csharp
 var calculateTotal = new Rule
@@ -248,26 +254,23 @@ var calculateTotal = new Rule
     Description = "Calculate total",
     DependsOnRuleId = calculateTax.Id,
     Expression = "true",
-    Action = @"
-        if (context.TryGetValue<decimal>(calculateTax.Id, out var taxAmount))
-        {
-            customer.Total = customer.Amount + taxAmount;
-        }
-        else
-        {
-            customer.Total = customer.Amount; // No tax applied
-        }",
+    Action = @"customer.Total = customer.TaxAmount > 0
+        ? customer.Amount + customer.TaxAmount
+        : customer.Amount;",
     IsActive = true
 };
 ```
 
 ### Conditional Logic Based on Dependencies
 
+The upstream rule records its outcome on the shared object; the downstream rule reads it.
+
 ```csharp
 var checkAuthentication = new Rule
 {
     Description = "Check authentication",
     Expression = "customer.IsAuthenticated",
+    Action = "customer.IsAuthenticated = true",
     IsActive = true
 };
 
@@ -275,7 +278,7 @@ var checkAuthorization = new Rule
 {
     Description = "Check authorization",
     DependsOnRuleId = checkAuthentication.Id,
-    Expression = @"context.GetResult(checkAuth.Id).Success && customer.HasAdminRole",
+    Expression = @"customer.IsAuthenticated && customer.HasAdminRole",
     IsActive = true
 };
 ```
@@ -355,7 +358,8 @@ Use a dependency as a gatekeeper. The dependent rule always runs but checks the 
 var gatekeeper = new Rule
 {
     Description = "Feature enabled",
-    Expression = "FeatureFlags.IsEnabled("PremiumFeature")",
+    Expression = "FeatureFlags.IsEnabled(\"PremiumFeature\")",
+    Action = "customer.FeatureEnabled = FeatureFlags.IsEnabled(\"PremiumFeature\")",
     IsActive = true
 };
 
@@ -363,7 +367,7 @@ var premiumCheck = new Rule
 {
     Description = "Premium validation",
     DependsOnRuleId = gatekeeper.Id,
-    Expression = "context.GetResult(gatekeeper.Id).Success && customer.IsPremium",
+    Expression = "customer.FeatureEnabled && customer.IsPremium",
     IsActive = true
 };
 ```
@@ -408,6 +412,7 @@ var eligibilityCheck = new Rule
 {
     Description = "Eligibility",
     Expression = "customer.Age >= 18 && customer.Income > 30000",
+    Action = "customer.IsEligible = customer.Age >= 18 && customer.Income > 30000",
     IsActive = true
 };
 
@@ -415,7 +420,7 @@ var standardOffer = new Rule
 {
     Description = "Standard offer",
     DependsOnRuleId = eligibilityCheck.Id,
-    Expression = "context.GetResult(eligibility.Id).Success && customer.Income < 100000",
+    Expression = "customer.IsEligible && customer.Income < 100000",
     IsActive = true
 };
 
@@ -423,7 +428,7 @@ var premiumOffer = new Rule
 {
     Description = "Premium offer",
     DependsOnRuleId = eligibilityCheck.Id,
-    Expression = "context.GetResult(eligibility.Id).Success && customer.Income >= 100000",
+    Expression = "customer.IsEligible && customer.Income >= 100000",
     IsActive = true
 };
 ```
@@ -445,7 +450,8 @@ var validateAge = new Rule
 {
     Description = "Validate age",
     DependsOnRuleId = parseInput.Id,
-    Expression = @"context.GetResult(parse.Id).Success && customer.ParsedAge >= 18",
+    Expression = @"customer.ParsedAge >= 18",
+    Action = "customer.IsAdult = customer.ParsedAge >= 18",
     IsActive = true
 };
 
@@ -453,8 +459,8 @@ var processAdult = new Rule
 {
     Description = "Process adult",
     DependsOnRuleId = validateAge.Id,
-    Expression = @"context.GetResult(validateAge.Id).Success",
-    Action = "customer.IsAdult = true",
+    Expression = @"customer.IsAdult",
+    Action = "customer.Processed = true",
     IsActive = true
 };
 ```
@@ -473,11 +479,11 @@ var processAdult = new Rule
 
 **Fix:** Redesign rules to break the cycle. Use parent-child relationships for tight coupling instead.
 
-### "Expected dependency result but context was empty"
+### Downstream rule reads a stale or default value
 
-**Cause:** Rule is trying to access `context.GetResult()` but the dependency hasn't executed yet.
+**Cause:** The downstream rule ran before the upstream rule mutated the shared parameter object, or the upstream `Action` never set the property.
 
-**Fix:** Ensure `DependsOnRuleId` is set correctly. The workflow engine executes dependencies first automatically.
+**Fix:** Ensure `DependsOnRuleId` is set correctly so the dependency runs first, and confirm the upstream rule's `Action` assigns the property the downstream rule reads. Remember: compiled expressions/actions can only reference the declared parameters — there is no `context` available inside expression strings. Use the host-side `RuleContext` only from C# code after execution.
 
 ### Priority not respected
 

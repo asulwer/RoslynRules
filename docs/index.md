@@ -19,7 +19,7 @@ High-performance .NET rules engine with Roslyn compilation, typed delegates, and
   </thead>
   <tbody>
     <tr><td><strong>Roslyn Compilation</strong></td><td>Expressions compile to IL once, execute as native code</td></tr>
-    <tr><td><strong>Typed Delegates</strong></td><td>Direct <code>Func&lt;T,R&gt;</code> calls — no <code>DynamicInvoke</code> overhead</td></tr>
+    <tr><td><strong>Typed Delegates</strong></td><td>Single-parameter rules invoke <code>Func&lt;T,R&gt;</code> directly — no <code>DynamicInvoke</code> overhead (multi-parameter rules use <code>DynamicInvoke</code>)</td></tr>
     <tr><td><strong>Single Parameter</strong></td><td>One input, one output — no array allocation per call</td></tr>
     <tr><td><strong>Immutable Rules</strong></td><td>Lock after compile — zero thread contention</td></tr>
     <tr><td><strong>Parallel Execution</strong></td><td><code>Parallel.For</code> for independent rule evaluation</td></tr>

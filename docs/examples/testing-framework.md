@@ -32,9 +32,11 @@ var test = RuleTest.For(adultRule)
     .ExpectAllChildrenPass()
     .ExpectValue(true);
 
+// Run() throws RuleAssertionException if any expectation fails,
+// otherwise returns the RuleResult.
 var result = test.Run();
-// result.Passed = true
-// result.ErrorMessage = null
+// result.Success = true
+// result.Exception = null
 ```
 
 ### Testing Failure Cases
@@ -42,12 +44,11 @@ var result = test.Run();
 ```csharp
 var test = RuleTest.For(adultRule)
     .WithInput("customer", new Customer { Age = 16, Name = "Bob" })
-    .ExpectFailure()
-    .ExpectNoException();
+    .ExpectFailure();
 
 var result = test.Run();
-// result.Passed = true
-// result.RuleResult.Success = false
+// result.Success = false
+// result.Exception = null
 ```
 
 ### Testing with Multiple Inputs
@@ -107,6 +108,8 @@ var parent = new Rule
     }
 };
 
+var compiler = new ExpressionCompiler();
+parent.Compile(compiler, parameters);
 var result = parent.Execute(parameters);
 
 // All children passed
@@ -129,10 +132,11 @@ result.ShouldHaveChild("Child 2").ShouldFail();
 var badRule = new Rule
 {
     Description = "Bad rule",
-    Expression = "throw new ArgumentException("test")"
+    Expression = "throw new ArgumentException(\"test\")"
 };
 
-badRule.Compile(parameters);
+var compiler = new ExpressionCompiler();
+badRule.Compile(compiler, parameters);
 var result = badRule.Execute(parameters);
 
 // Assert exception type
@@ -189,15 +193,15 @@ Console.WriteLine(result.ToString());
 // Rule Test Suite: 3 passed, 0 failed (3 total)
 //   ✅ PASS Adult check
 //   ✅ PASS Name check
-//   ✅ FAIL Inactive rule (expected)
+//   ✅ PASS Inactive rule
 
 // Detailed results
-foreach (var testResult in result.Results)
+foreach (var testResult in result.Tests)
 {
-    Console.WriteLine($"{testResult.RuleDescription}: {(testResult.Passed ? "PASS" : "FAIL")}");
+    Console.WriteLine($"{testResult.TestName}: {(testResult.Passed ? "PASS" : "FAIL")}");
     if (!testResult.Passed)
     {
-        Console.WriteLine($"  Error: {testResult.ErrorMessage}");
+        Console.WriteLine($"  Error: {testResult.Exception?.Message}");
     }
 }
 ```
@@ -251,7 +255,7 @@ var test = RuleTest.For(rule)
 var test = RuleTest.For(rule)
     .WithInput("customer", customer)
     .ExpectSuccess()
-    .ExpectValueOfType<ValidationResult>()
+    .Assert(r => r.ShouldHaveValueOfType<ValidationResult>())
     .Assert(r =>
     {
         var result = (ValidationResult)r.Value;
@@ -353,14 +357,15 @@ public void AdultRule_WithAdultCustomer_ShouldPass()
         new RuleParameter("customer", typeof(Customer), new Customer { Age = 25 })
     };
 
-    rule.Compile(parameters);
+    var compiler = new ExpressionCompiler();
+    rule.Compile(compiler, parameters);
     var result = rule.Execute(parameters);
 
     // Framework assertions
     result.ShouldPass();
     
     // FluentAssertions for complex checks
-    result.ElapsedMilliseconds.Should().BeLessThan(1);
+    result.Success.Should().BeTrue();
     result.RuleDescription.Should().Be("Adult check");
     result.ChildResults.Should().BeEmpty();
 }
@@ -406,7 +411,8 @@ public class AgeRuleTests
             IsActive = true
         };
         _parameters = new[] { new RuleParameter("customer", typeof(Customer), default) };
-        _rule.Compile(_parameters);
+        var compiler = new ExpressionCompiler();
+        _rule.Compile(compiler, _parameters);
     }
 
     [Fact]
@@ -452,8 +458,9 @@ public void AllValidationRules_ShouldPassWithValidCustomer()
 public void Rule_ShouldCompileSuccessfully()
 {
     var rule = new Rule { Expression = "customer.Age >= 18" };
-    
-    var act = () => rule.Compile(parameters);
+    var compiler = new ExpressionCompiler();
+
+    var act = () => rule.Compile(compiler, parameters);
     act.Should().NotThrow();
 }
 
@@ -461,9 +468,10 @@ public void Rule_ShouldCompileSuccessfully()
 public void Rule_WithSyntaxError_ShouldThrow()
 {
     var rule = new Rule { Expression = "customer.Age >= " }; // Syntax error
-    
-    var act = () => rule.Compile(parameters);
-    act.Should().Throw<SyntaxErrorException>();
+    var compiler = new ExpressionCompiler();
+
+    var act = () => rule.Compile(compiler, parameters);
+    act.Should().Throw<InvalidOperationException>();
 }
 ```
 

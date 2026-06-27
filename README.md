@@ -106,7 +106,8 @@ var workflow = new Workflow
     }
 };
 
-workflow.Compile(compiler, new[] { compileParam });
+// Workflow owns its own compiler — pass parameters only (no compiler argument)
+workflow.Compile(new[] { compileParam });
 
 // Execute with real data
 var results = workflow.Execute(new[] { param });
@@ -132,9 +133,9 @@ using RoslynRules.Json;
 
 var workflow = JsonRuleLoader.LoadWorkflowFromFile("rules.json");
 
-// Compile before executing
+// Compile before executing (Workflow.Compile takes parameters only)
 var compileParam = new RuleParameter("customer", typeof(Customer));
-workflow.Compile(compiler, new[] { compileParam });
+workflow.Compile(new[] { compileParam });
 
 // Execute
 var customer = new Customer { Name = "Alice", Age = 25 };
@@ -202,22 +203,25 @@ Most rules engines parse expressions into trees and walk them every execution. R
 The `ExpressionCompiler` caches delegates in a `ConcurrentDictionary`. Compile a rule, and you get back the same delegate on subsequent calls. No recompilation, no assembly bloat.
 
 **Rules can depend on each other.**
-Use `DependsOnRuleId` to build pipelines where one rule reads another's output. Dependencies are validated at compile time (no missing references) and resolved with topological sorting.
+Use `DependsOnRuleId` to build pipelines where a dependent rule runs after its dependency. The dependency's `Action` mutates the shared parameter, and the dependent rule reads that value. Dependencies are validated at compile time (no missing references) and resolved with topological sorting.
 
 ```csharp
 var validate = new Rule
 {
     Description = "Validate",
-    Expression = "customer.IsActive"
+    Expression = "customer.IsActive",
+    Action = "customer.Validated = true"   // write to the shared parameter
 };
 
 var process = new Rule
 {
     Description = "Process",
-    DependsOnRuleId = validate.Id,
-    Expression = "context.GetResult(validate.Id).Success"
+    DependsOnRuleId = validate.Id,         // runs after 'validate'
+    Expression = "customer.Validated"      // reads what 'validate' wrote
 };
 ```
+
+> Expressions and actions can only reference the parameters you pass to `Compile`/`Execute`. The `RuleContext` (`context.GetResult(...)`) is available to your host code, not inside expression strings — chain data by mutating the shared parameter object.
 
 **Async without ceremony.**
 Expressions with `await` are auto-detected and compiled to async delegates. No manual `Task` wrapping.

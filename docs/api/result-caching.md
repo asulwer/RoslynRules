@@ -5,7 +5,7 @@ parent: API Reference
 nav_order: 16
 ---
 
-[← Back to API Reference](api-reference.md)
+[← Back to API Reference](../api-reference.md)
 
 # Result Caching (Memoization)
 

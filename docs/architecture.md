@@ -102,30 +102,33 @@ Subsequent calls with the same signature return the cached delegate instantly.
 
 ## Execution Model
 
+The compiled delegate held by each rule is an internal implementation detail (the
+`CompiledDelegate` hierarchy is `internal`). Single-parameter rules use a direct typed
+invoke; multi-parameter rules dispatch via `DynamicInvoke`. The snippets below show the
+**public** execution surface that drives that machinery.
+
 ### Sequential
 
 ```csharp
-foreach (var rule in workflow.Rules)
+foreach (var result in workflow.Execute(parameters))
 {
-    var result = rule.CompiledDelegate.Invoke(parameters);
-    context.StoreResult(rule.Id, result);
+    // Results are yielded in dependency order.
 }
 ```
 
 ### Parallel
 
 ```csharp
-Parallel.ForEach(rules, rule => {
-    var result = rule.CompiledDelegate.Invoke(parameters);
-    // Thread-safe result storage
-});
+RuleResult[] results = workflow.ExecuteParallel(parameters);
 ```
 
 ### Async
 
 ```csharp
-var asyncDel = (Func<Customer, Task<bool>>)rule.CompiledDelegate;
-var result = await asyncDel(customer);
+await foreach (var result in workflow.ExecuteAsync(parameters))
+{
+    // Awaitable rules run asynchronously.
+}
 ```
 
 ---

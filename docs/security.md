@@ -137,13 +137,21 @@ var rule = new Rule
 
 ## Dependency Patterns
 
-Use `DependsOnRuleId` to chain rules securely — data flows through `RuleContext`, not shared state:
+Use `DependsOnRuleId` to chain rules securely. Expressions and actions can only reference declared `RuleParameter`s — there is no `context` variable in scope. To pass data between rules, have the upstream rule's `Action` mutate a shared parameter object and have the downstream rule read the mutated property, ordering them with `DependsOnRuleId`:
 
 ```csharp
-var auth = new Rule { Id = authId, Expression = "user.IsAuthenticated" };
+// Upstream rule writes the authorization result onto the shared parameter.
+var auth = new Rule
+{
+    Id = authId,
+    Expression = "user.IsAuthenticated",
+    Action = "session.IsAuthorized = user.IsAuthenticated"
+};
+
+// Downstream rule reads the mutated property; ordering is enforced via DependsOnRuleId.
 var admin = new Rule
 {
-    Expression = "context.GetValue<bool>(authId)",
+    Expression = "session.IsAuthorized",
     DependsOnRuleId = authId
 };
 ```
@@ -157,7 +165,7 @@ var admin = new Rule
 - [ ] Set `Timeout` on untrusted rules
 - [ ] Monitor `CompileCount` and ALC recycling
 - [ ] Never include `System.IO`, `System.Net`, `System.Diagnostics`
-- [ ] Use `RuleContext` for dependency data, not shared mutable state
+- [ ] Pass cross-rule data through declared `RuleParameter`s mutated by upstream actions, ordered via `DependsOnRuleId`
 - [ ] Log compilation failures for audit trail
 
 ---

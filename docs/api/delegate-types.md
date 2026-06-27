@@ -5,15 +5,19 @@ parent: API Reference
 nav_order: 7
 ---
 
-[← Back to API Reference](api-reference.md)
+[← Back to API Reference](../api-reference.md)
 
 # Delegate Types
 
-RoslynRules supports exactly **one input parameter**. Return multiple values by wrapping them in a struct or class.
+RoslynRules supports **up to 16 input parameters** per expression or action. Single-parameter
+signatures take a fast, strongly-typed path; multi-parameter signatures (2–16 parameters) are
+supported as well. To return multiple values from a single rule, wrap them in a struct or class.
 
 ---
 
 ## Supported Signatures
+
+Single-parameter signatures (fastest path):
 
 | Type | Delegate | Example |
 |------|----------|---------|
@@ -22,6 +26,15 @@ RoslynRules supports exactly **one input parameter**. Return multiple values by 
 | **Action** | `Action<TParam>` | `Action<Customer>` |
 | **Async Expression** | `Func<TParam, Task<bool>>` | `Func<Customer, Task<bool>>` |
 | **Async Action** | `Func<TParam, Task>` | `Func<Customer, Task>` |
+
+Multi-parameter signatures (up to 16 parameters) follow the same shapes:
+
+| Type | Delegate | Example |
+|------|----------|---------|
+| **Expression** | `Func<T1, …, Tn, bool>` | `Func<Customer, Order, bool>` |
+| **Action** | `Action<T1, …, Tn>` | `Action<Customer, Order>` |
+| **Async Expression** | `Func<T1, …, Tn, Task<bool>>` | `Func<Customer, Order, Task<bool>>` |
+| **Async Action** | `Func<T1, …, Tn, Task>` | `Func<Customer, Order, Task>` |
 
 ---
 

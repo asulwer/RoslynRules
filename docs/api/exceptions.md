@@ -5,7 +5,7 @@ parent: API Reference
 nav_order: 5
 ---
 
-[← Back to API Reference](api-reference.md)
+[← Back to API Reference](../api-reference.md)
 
 # Exceptions
 
@@ -22,14 +22,14 @@ public abstract class RulesException : Exception
 | Exception | When Thrown |
 |-----------|-------------|
 | `RuleValidationException` | Rule has no Expression, Action, or active children |
-| `CircularReferenceException` | Circular reference in child rules or `DependsOnRuleId` chain |
-| `SyntaxErrorException` | Invalid C# syntax in expression or action |
+| `CircularReferenceException` | Circular reference in the child rule tree (extends `RuleValidationException`) |
+| `SyntaxErrorException` | Invalid C# syntax in expression or action (extends `RuleValidationException`) |
 | `RuleCompilationException` | Roslyn compilation failure |
-| `NotCompiledException` | `Execute` called before `Compile` |
-| `RuleExecutionException` | Runtime error in compiled code |
+| `NotCompiledException` | `Execute` called before `Compile` (extends `RuleCompilationException`) |
 | `RuleTimeoutException` | Rule exceeded configured `Timeout` |
 | `WorkflowException` | Workflow has no active rules |
-| `DuplicateRuleIdException` | Duplicate rule IDs in same workflow |
+| `DuplicateRuleIdException` | Duplicate rule IDs in same workflow (extends `WorkflowException`) |
+| `AotCompatibilityException` | A JIT-only API was called in an AOT/trimming environment |
 
 ---
 

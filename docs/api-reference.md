@@ -24,7 +24,6 @@ Complete reference for all RoslynRules public APIs, organized by component.
     <tr><td><a href="api/ruleparameter.html">RuleParameter</a></td><td>Parameter definition (name, type, value)</td></tr>
     <tr><td><a href="api/rule-diagnostics.html">RuleDiagnostics</a></td><td>Diagnostics, logging, and auditing model</td></tr>
     <tr><td><a href="api/rule-lifecycle-events.html">RuleLifecycleEvents</a></td><td>OnRuleExecuting/OnRuleExecuted event args</td></tr>
-    <tr><td><a href="api/compiled-delegate.html">CompiledDelegate</a></td><td>Fast invocation wrapper for compiled delegates</td></tr>
   </tbody>
 </table>
 
