@@ -277,6 +277,33 @@ namespace RoslynRules.Tests.Execution
         }
 
         [Fact]
+        public void Execute_Cache_MutatedReferenceParameter_ReEvaluates()
+        {
+            var customer = new TestCustomer { Age = 30, Name = "Alice" };
+            var parameters = new[] { new RuleParameter("customer", typeof(TestCustomer), customer) };
+
+            var rule = new Rule
+            {
+                Description = "Adult check",
+                Expression = "customer.Age >= 18",
+                IsActive = true,
+                CacheDuration = TimeSpan.FromMinutes(5)
+            };
+
+            rule.Compile(_compiler, parameters, new[] { "RoslynRules.Tests" });
+
+            var result1 = rule.Execute(parameters);
+            result1.Success.Should().BeTrue();
+
+            // Mutate the same instance so the result should flip. Value-based cache keys must
+            // produce a different key and re-evaluate rather than return the stale cached result.
+            customer.Age = 10;
+            var result2 = rule.Execute(parameters);
+
+            result2.Success.Should().BeFalse("mutating the parameter must invalidate the cached result");
+        }
+
+        [Fact]
         public void Execute_Cache_ArrayDifferentContents_DifferentResults()
         {
             var rule = new Rule

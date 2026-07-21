@@ -8,9 +8,18 @@ using System.Reflection;
 namespace RoslynRules.Compiler
 {
     /// <summary>
-    /// Provides a configurable whitelist of assemblies for expression compilation.
-    /// Only whitelisted assemblies are exposed to compiled expressions, preventing
-    /// arbitrary code execution (e.g. System.IO.File.Delete, Process.Start).
+    /// Scopes which assemblies are made available as <em>references</em> when compiling
+    /// expressions, so accidental use of unrelated assemblies fails to compile.
+    /// <para>
+    /// IMPORTANT: this is NOT a security sandbox. Expression strings are compiled as
+    /// trusted C# and run in-process with full trust. Reference scoping does not stop a
+    /// determined expression from reaching dangerous types: core types such as
+    /// <c>System.IO.File</c>, <c>System.Diagnostics.Process</c>, and all of reflection
+    /// live in always-referenced core assemblies (System.Private.CoreLib / System.Runtime),
+    /// and reflection (<c>Type.GetType(...).GetMethod(...).Invoke(...)</c>) can reach anything.
+    /// Never compile expression strings that originate from untrusted input. If you must
+    /// evaluate untrusted rules, run them in a separate OS-sandboxed process.
+    /// </para>
     /// </summary>
     public class AssemblyReferenceProvider
     {
@@ -43,7 +52,10 @@ namespace RoslynRules.Compiler
         };
 
         /// <summary>
-        /// Known dangerous assemblies that should never be included.
+        /// Assemblies excluded from the reference set as a convenience so common risky
+        /// APIs are not resolvable by accident. This is a best-effort convenience only,
+        /// NOT a security control — many of these types are also reachable through the
+        /// always-referenced core assemblies. See the type-level remarks.
         /// </summary>
         public static readonly string[] KnownDangerousAssemblies = new[]
         {

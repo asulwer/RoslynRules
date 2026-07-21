@@ -82,7 +82,7 @@ namespace RoslynRules.Models
         /// Useful for identifying exactly which child rule caused a parent failure.
         /// </summary>
         public RuleResult? FirstFailure =>
-            ChildResults.FirstOrDefault(r => !r.Success);
+            ChildResults.Where(r => !r.Success).Cast<RuleResult?>().FirstOrDefault();
 
         /// <summary>
         /// Returns all failing child results.

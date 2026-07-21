@@ -11,8 +11,10 @@ namespace RoslynRules.Compiler
 {
     /// <summary>
     /// Compiles C# source code into an in-memory assembly using Roslyn.
-    /// Uses an AssemblyReferenceProvider to restrict which assemblies are exposed to expressions,
-    /// preventing arbitrary code execution from user-supplied expression strings.
+    /// Uses an AssemblyReferenceProvider to scope which assemblies are exposed as references.
+    /// NOTE: reference scoping is a convenience, not a security boundary — expression strings
+    /// are compiled as trusted, full-trust in-process code. Do not compile untrusted input.
+    /// See <see cref="AssemblyReferenceProvider"/> remarks.
     /// </summary>
     internal static class AssemblyCompiler
     {

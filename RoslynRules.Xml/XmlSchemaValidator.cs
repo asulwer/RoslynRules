@@ -69,7 +69,11 @@ public static class XmlSchemaValidator
         {
             Schemas = schemaSet,
             ValidationType = ValidationType.Schema,
-            ValidationFlags = XmlSchemaValidationFlags.ReportValidationWarnings
+            ValidationFlags = XmlSchemaValidationFlags.ReportValidationWarnings,
+            // Explicitly harden against XXE: prohibit DTDs and resolve no external entities.
+            // These match the framework defaults but are stated so the safety is intentional.
+            DtdProcessing = DtdProcessing.Prohibit,
+            XmlResolver = null
         };
 
         settings.ValidationEventHandler += (sender, e) =>

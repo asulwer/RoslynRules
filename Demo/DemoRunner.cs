@@ -23,7 +23,11 @@ public static class DemoRunner
 
     public static void LoadCustomers()
     {
-        var json = File.ReadAllText("Data/Customers.json");
+        // Resolve relative to the app's base directory (where Data/Customers.json is copied)
+        // rather than the current working directory, so the demo runs from any location
+        // (e.g. `dotnet run` from the repo root, not just from the output folder).
+        var path = Path.Combine(AppContext.BaseDirectory, "Data", "Customers.json");
+        var json = File.ReadAllText(path);
         var doc = JsonDocument.Parse(json);
         Customers.AddRange(doc.RootElement.GetProperty("customers").EnumerateArray()
             .Select(c => new Customer

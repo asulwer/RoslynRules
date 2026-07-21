@@ -97,7 +97,7 @@ namespace RoslynRules.Tests.Execution
         }
 
         [Fact]
-        public void Build_MutableReferenceType_DifferentInstances_DifferentKey()
+        public void Build_ReferenceType_DifferentInstances_SameValues_SameKey()
         {
             var ruleId = Guid.NewGuid();
             var obj1 = new MutableCustomer { Name = "Alice", Age = 30 };
@@ -109,12 +109,28 @@ namespace RoslynRules.Tests.Execution
             var key1 = CacheKeyBuilder.Build(ruleId, params1);
             var key2 = CacheKeyBuilder.Build(ruleId, params2);
 
-            // Different instances should have different cache keys (identity-based)
+            // Value-based hashing: distinct instances with equal state share a cache key.
+            key1.Should().Be(key2);
+        }
+
+        [Fact]
+        public void Build_ReferenceType_DifferentValues_DifferentKey()
+        {
+            var ruleId = Guid.NewGuid();
+            var obj1 = new MutableCustomer { Name = "Alice", Age = 30 };
+            var obj2 = new MutableCustomer { Name = "Alice", Age = 31 };
+
+            var params1 = new[] { new RuleParameter("customer", typeof(MutableCustomer), obj1) };
+            var params2 = new[] { new RuleParameter("customer", typeof(MutableCustomer), obj2) };
+
+            var key1 = CacheKeyBuilder.Build(ruleId, params1);
+            var key2 = CacheKeyBuilder.Build(ruleId, params2);
+
             key1.Should().NotBe(key2);
         }
 
         [Fact]
-        public void Build_MutableReferenceType_SameInstance_AfterMutation_SameKey()
+        public void Build_ReferenceType_SameInstance_AfterMutation_DifferentKey()
         {
             var ruleId = Guid.NewGuid();
             var obj = new MutableCustomer { Name = "Alice", Age = 30 };
@@ -122,15 +138,15 @@ namespace RoslynRules.Tests.Execution
             var params1 = new[] { new RuleParameter("customer", typeof(MutableCustomer), obj) };
             var key1 = CacheKeyBuilder.Build(ruleId, params1);
 
-            // Mutate the object
+            // Mutate the object in place.
             obj.Name = "Bob";
             obj.Age = 40;
 
             var params2 = new[] { new RuleParameter("customer", typeof(MutableCustomer), obj) };
             var key2 = CacheKeyBuilder.Build(ruleId, params2);
 
-            // Same instance should have same cache key even after mutation (identity-based)
-            key1.Should().Be(key2);
+            // Value-based hashing: mutating the object changes the key, preventing stale cache hits.
+            key1.Should().NotBe(key2);
         }
 
         [Fact]
@@ -253,7 +269,7 @@ namespace RoslynRules.Tests.Execution
         }
 
         /// <summary>
-        /// Mutable reference type for testing identity-based cache keys.
+        /// Mutable reference type for testing value-based cache keys.
         /// </summary>
         private class MutableCustomer
         {
