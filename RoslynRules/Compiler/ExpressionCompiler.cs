@@ -13,10 +13,21 @@ namespace RoslynRules.Compiler
     /// </summary>
     public class ExpressionCompiler
     {
-        private readonly ConcurrentDictionary<string, Delegate> _cache = new();
+        // Values are Lazy so that, under concurrent GetOrAdd for the same key, the expensive
+        // compilation runs exactly once (ConcurrentDictionary.GetOrAdd may otherwise invoke its
+        // factory multiple times, loading duplicate assemblies into the load context).
+        private readonly ConcurrentDictionary<string, Lazy<Delegate>> _cache = new();
         private readonly int _maxCompilesBeforeRecycle;
         private readonly object _lock = new();
+
+        // Lifetime diagnostic total. Reset only by an explicit Unload(), never by auto-recycle.
         private int _compileCount = 0;
+
+        // Drives the recycle threshold; reset on every recycle (auto or explicit). Separating this
+        // from _compileCount fixes a latent bug where, once the threshold was crossed, the context
+        // recycled on every subsequent compile because the single counter never reset.
+        private int _compilesSinceRecycle = 0;
+
         private ExpressionAssemblyLoadContext _context;
 
         /// <summary>
@@ -53,12 +64,27 @@ namespace RoslynRules.Compiler
         {
             AotCompatibility.ThrowIfAot("ExpressionCompiler.Compile<TDelegate>");
 
-            // STEP 1: Build a unique cache key.
-            var cacheKey = BuildCacheKey<TDelegate>(expression, parameterNames, additionalNamespaces);
+            // STEP 1: Build a unique cache key. The reference provider is part of the key so
+            // that the same expression compiled under different providers is not shared.
+            var cacheKey = BuildCacheKey<TDelegate>(expression, parameterNames, additionalNamespaces, referenceProvider);
 
-            // Atomic GetOrAdd — compilation happens inside the factory, so only one thread compiles.
-            var del = _cache.GetOrAdd(cacheKey, key => CompileInternal<TDelegate>(expression, parameterNames, additionalNamespaces, referenceProvider));
-            return (TDelegate)del;
+            // The Lazy guarantees CompileInternal runs once per key even if GetOrAdd's factory
+            // is raced; the winning Lazy's Value performs the single compilation.
+            var lazy = _cache.GetOrAdd(cacheKey, _ => new Lazy<Delegate>(
+                () => CompileInternal<TDelegate>(expression, parameterNames, additionalNamespaces, referenceProvider)));
+
+            try
+            {
+                return (TDelegate)lazy.Value;
+            }
+            catch
+            {
+                // A Lazy caches thrown exceptions, so a failed compilation would otherwise be
+                // returned forever. Remove this exact entry so a later call can retry.
+                ((System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<string, Lazy<Delegate>>>)_cache)
+                    .Remove(new System.Collections.Generic.KeyValuePair<string, Lazy<Delegate>>(cacheKey, lazy));
+                throw;
+            }
         }
 
         private TDelegate CompileInternal<TDelegate>(
@@ -70,11 +96,12 @@ namespace RoslynRules.Compiler
             // Check compile limit and recycle ALC if needed.
             lock (_lock)
             {
-                if (_maxCompilesBeforeRecycle > 0 && _compileCount >= _maxCompilesBeforeRecycle)
+                if (_maxCompilesBeforeRecycle > 0 && _compilesSinceRecycle >= _maxCompilesBeforeRecycle)
                 {
                     RecycleContext();
                 }
                 _compileCount++;
+                _compilesSinceRecycle++;
             }
 
             // STEP 2: Reflect the delegate type to discover its signature.
@@ -110,8 +137,8 @@ namespace RoslynRules.Compiler
         {
             lock (_lock)
             {
-                _cache.Clear();
                 RecycleContext();
+                // Explicit unload also resets the lifetime diagnostic counter.
                 _compileCount = 0;
             }
         }
@@ -137,14 +164,18 @@ namespace RoslynRules.Compiler
 
         private void RecycleContext()
         {
-            // Unload the current context. The ALC becomes collectible once all
-            // delegates loaded from it are no longer referenced. Since the cache
-            // holds strong references to delegates, we must clear it first.
+            // Clear cached delegates FIRST. Each cached delegate holds a strong reference to an
+            // assembly loaded in the outgoing context; leaving them in the cache would pin that
+            // context and prevent Unload from ever reclaiming its memory. Dropping them lets the
+            // old ALC be collected — expressions transparently recompile on next use.
+            _cache.Clear();
+            _compilesSinceRecycle = 0;
+
             var oldContext = _context;
             _context = CreateContext();
 
-            // Note: The old ALC is now eligible for GC collection. The actual unload
-            // happens on the next GC cycle after all references are released.
+            // The old ALC is now eligible for collection once any in-flight delegate references
+            // are released; the actual unload completes on a subsequent GC cycle.
             oldContext.Unload();
         }
 
@@ -159,9 +190,17 @@ namespace RoslynRules.Compiler
         private static string BuildCacheKey<TDelegate>(
             string expression,
             string[] parameterNames,
-            string[]? additionalNamespaces)
+            string[]? additionalNamespaces,
+            AssemblyReferenceProvider? referenceProvider)
         {
-            var key = $"{typeof(TDelegate).FullName}:{expression}:{string.Join(",", parameterNames)}";
+            // A different provider changes which references (and thus which resolutions) are
+            // available, so it must not share a compiled delegate. Providers do not define value
+            // equality, so identity is used: the same provider instance reuses its cache entry.
+            var providerKey = referenceProvider is null
+                ? "default"
+                : referenceProvider.GetHashCode().ToString();
+
+            var key = $"{typeof(TDelegate).FullName}:{expression}:{string.Join(",", parameterNames)}:{providerKey}";
 
             if (additionalNamespaces != null && additionalNamespaces.Length > 0)
             {

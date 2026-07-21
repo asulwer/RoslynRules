@@ -174,8 +174,10 @@ namespace RoslynRules.Benchmarks
             };
             rule.Compile(_compiler, _parameters);
 
-            // Fill with unique entries
-            int entries = 100000;
+            // Fill with unique entries. Kept below the per-rule result-cache cap (10,000 entries)
+            // so the per-entry overhead is measured accurately; beyond the cap the cache evicts
+            // to bound memory, which would otherwise skew the bytes/entry figure.
+            int entries = 5000;
             for (int i = 0; i < entries; i++)
             {
                 var param = new RuleParameter("x", typeof(int), i);

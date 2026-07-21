@@ -11,6 +11,15 @@
     <IsTrimmable>true</IsTrimmable>
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
 
+    <!--
+      This package intentionally exposes reflection-based System.Text.Json convenience methods
+      (JsonRuleLoader.Serialize/Deserialize) alongside the trim/AOT-safe *Aot methods and the
+      source-generated RoslynRulesJsonContext. IL2026 on the reflection path is expected and
+      documented on those APIs. Suppressed to keep the build clean, consistent with how the core
+      RoslynRules project suppresses IL2026 for its known reflection usage.
+    -->
+    <NoWarn>$(NoWarn);IL2026</NoWarn>
+
     <!-- NuGet Package Metadata -->
     <PackageId>RoslynRules.Json</PackageId>
     <Authors>Aaron Sulwer</Authors>

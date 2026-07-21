@@ -378,6 +378,19 @@ namespace RoslynRules.Models
                 r => r.DependsOnRuleId,
                 priorityComparer);
         }
+
+        /// <summary>
+        /// Determines whether a rule's dependency is satisfied for the current execution pass.
+        /// A rule is runnable when it has no dependency, its dependency has already executed,
+        /// or its dependency is dangling (points outside the active rule set). Dangling
+        /// dependencies are tolerated identically across sequential and parallel execution.
+        /// </summary>
+        private static bool DependencySatisfied(Rule rule, HashSet<Guid> executed, HashSet<Guid> activeIds)
+        {
+            var dep = rule.DependsOnRuleId;
+            return !dep.HasValue || executed.Contains(dep.Value) || !activeIds.Contains(dep.Value);
+        }
+
         // ==================== SYNCHRONOUS EXECUTION ====================
 
         /// <summary>
@@ -420,35 +433,27 @@ namespace RoslynRules.Models
             if (orderedRules.Count == 0)
                 return Array.Empty<RuleResult>();
 
-            // Pre-allocate result array.
-            var results = new RuleResult[orderedRules.Count];
             var context = new RuleContext();
 
-            // Group rules by dependency level (rules with no deps can run in parallel)
+            // Level-based execution: each pass runs every rule whose dependencies are already
+            // satisfied (in parallel), then advances. Collecting all runnable rules per pass —
+            // rather than only a consecutive prefix — maximizes parallelism, and dangling
+            // dependencies are tolerated the same way sequential Execute tolerates them.
+            var activeIds = new HashSet<Guid>(orderedRules.Select(r => r.Id));
             var executed = new HashSet<Guid>();
-            var index = 0;
+            var resultById = new Dictionary<Guid, RuleResult>(orderedRules.Count);
+            var remaining = new List<Rule>(orderedRules);
 
-            while (index < orderedRules.Count)
+            while (remaining.Count > 0)
             {
-                // Find all rules at the current level whose dependencies have been executed
-                var batch = new List<Rule>();
-                for (int i = index; i < orderedRules.Count; i++)
-                {
-                    var rule = orderedRules[i];
-                    if (!rule.DependsOnRuleId.HasValue || executed.Contains(rule.DependsOnRuleId.Value))
-                    {
-                        batch.Add(rule);
-                    }
-                    else
-                    {
-                        break; // Dependencies not yet satisfied, stop batching
-                    }
-                }
-
+                var batch = remaining.Where(r => DependencySatisfied(r, executed, activeIds)).ToList();
                 if (batch.Count == 0)
                 {
-                    // Should not happen if GetExecutionOrder is correct, but guard against infinite loop
-                    throw new InvalidOperationException($"Dependency resolution stalled at rule '{orderedRules[index].Description}' (Id: {orderedRules[index].Id}).");
+                    // Unreachable when GetExecutionOrder succeeds (it throws on cycles first),
+                    // but guard against an infinite loop.
+                    throw new CircularReferenceException(
+                        remaining[0].Id,
+                        $"Dependency resolution stalled at rule '{remaining[0].Description}' (Id: {remaining[0].Id}).");
                 }
 
                 // Execute batch in parallel
@@ -458,17 +463,17 @@ namespace RoslynRules.Models
                     batchResults[i] = batch[i].ExecuteWithContext(context, parameters);
                 });
 
-                // Store results and mark as executed
                 for (int i = 0; i < batch.Count; i++)
                 {
-                    results[index + i] = batchResults[i];
+                    resultById[batch[i].Id] = batchResults[i];
                     executed.Add(batch[i].Id);
                 }
 
-                index += batch.Count;
+                remaining.RemoveAll(r => executed.Contains(r.Id));
             }
 
-            return results;
+            // Return in execution order (topological + priority).
+            return orderedRules.Select(r => resultById[r.Id]).ToArray();
         }
 
         // ==================== ASYNCHRONOUS EXECUTION ====================
@@ -524,54 +529,42 @@ namespace RoslynRules.Models
                 return Array.Empty<RuleResult>();
 
             var context = new RuleContext();
-            var executed = new HashSet<Guid>();
-            var allResults = new List<RuleResult>(orderedRules.Count);
 
-            int index = 0;
-            while (index < orderedRules.Count)
+            // Level-based execution: each pass runs all rules whose dependencies are satisfied,
+            // concurrently. Dangling dependencies are tolerated like sequential Execute.
+            var activeIds = new HashSet<Guid>(orderedRules.Select(r => r.Id));
+            var executed = new HashSet<Guid>();
+            var resultById = new Dictionary<Guid, RuleResult>(orderedRules.Count);
+            var remaining = new List<Rule>(orderedRules);
+
+            while (remaining.Count > 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // Build a batch: all consecutive rules whose dependencies are satisfied
-                var batch = new List<Rule>();
-                for (int i = index; i < orderedRules.Count; i++)
-                {
-                    var rule = orderedRules[i];
-                    if (!rule.DependsOnRuleId.HasValue || executed.Contains(rule.DependsOnRuleId.Value))
-                    {
-                        batch.Add(rule);
-                    }
-                    else
-                    {
-                        break; // Dependencies not yet satisfied, stop batching
-                    }
-                }
-
+                var batch = remaining.Where(r => DependencySatisfied(r, executed, activeIds)).ToList();
                 if (batch.Count == 0)
                 {
-                    // Should not happen if GetExecutionOrder is correct, but guard against infinite loop
+                    // Unreachable when GetExecutionOrder succeeds; guard against infinite loop.
                     throw new CircularReferenceException(
-                        orderedRules[index].Id,
-                        $"Dependency resolution failed at rule '{orderedRules[index].Description}'. " +
-                        $"Dependency {orderedRules[index].DependsOnRuleId} not found or not yet executed.");
+                        remaining[0].Id,
+                        $"Dependency resolution stalled at rule '{remaining[0].Description}' (Id: {remaining[0].Id}).");
                 }
 
                 // Execute this batch in parallel
                 var tasks = batch.Select(rule => rule.ExecuteWithContextAsync(context, parameters)).ToArray();
                 var results = await Task.WhenAll(tasks);
-                allResults.AddRange(results);
 
-                foreach (var rule in batch)
+                for (int i = 0; i < batch.Count; i++)
                 {
-                    executed.Add(rule.Id);
+                    resultById[batch[i].Id] = results[i];
+                    executed.Add(batch[i].Id);
                 }
 
-                index += batch.Count;
+                remaining.RemoveAll(r => executed.Contains(r.Id));
             }
 
             // Return results in original rule order (sorted by priority, with dependencies before dependents)
             var activeRules = Rules.Where(r => r.IsActive).ToArray();
-            var resultById = allResults.ToDictionary(r => r.RuleId);
             return activeRules.Select(r => resultById[r.Id]).ToArray();
         }
 
@@ -590,19 +583,41 @@ namespace RoslynRules.Models
             int bufferSize = 10,
             [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
+            if (bufferSize < 1)
+                throw new ArgumentOutOfRangeException(nameof(bufferSize), bufferSize, "Buffer size must be at least 1.");
+
             if (!IsActive)
                 yield break;
 
             var context = new RuleContext();
             var orderedRules = GetExecutionOrder();
 
-            for (int i = 0; i < orderedRules.Count; i += bufferSize)
+            // Only rules whose dependencies are already satisfied are placed in a chunk, so a
+            // dependent rule is never run in the same parallel buffer as its dependency. Each
+            // chunk is capped at bufferSize; remaining runnable rules spill into later chunks.
+            var activeIds = new HashSet<Guid>(orderedRules.Select(r => r.Id));
+            var executed = new HashSet<Guid>();
+            var remaining = new List<Rule>(orderedRules);
+
+            while (remaining.Count > 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var batch = orderedRules.Skip(i).Take(bufferSize).ToArray();
+                var batch = remaining.Where(r => DependencySatisfied(r, executed, activeIds)).Take(bufferSize).ToArray();
+                if (batch.Length == 0)
+                {
+                    // Unreachable when GetExecutionOrder succeeds; guard against infinite loop.
+                    throw new CircularReferenceException(
+                        remaining[0].Id,
+                        $"Dependency resolution stalled at rule '{remaining[0].Description}' (Id: {remaining[0].Id}).");
+                }
+
                 var tasks = batch.Select(rule => rule.ExecuteWithContextAsync(context, parameters)).ToArray();
                 var results = await Task.WhenAll(tasks);
+
+                foreach (var rule in batch)
+                    executed.Add(rule.Id);
+                remaining.RemoveAll(r => executed.Contains(r.Id));
 
                 yield return results;
             }

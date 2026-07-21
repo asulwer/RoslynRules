@@ -166,6 +166,69 @@ namespace RoslynRules.Tests.Execution
         }
 
         [Fact]
+        public async Task ExecuteBufferedAsync_DependentRule_NotInSameChunkAsDependency()
+        {
+            var depId = Guid.NewGuid();
+            var dependentId = Guid.NewGuid();
+
+            var workflow = new Workflow
+            {
+                Description = "Buffered with dependency",
+                Rules = new List<Rule>
+                {
+                    new Rule(depId) { Description = "Dependency", Expression = "true", IsActive = true },
+                    new Rule { Description = "Independent", Expression = "true", IsActive = true },
+                    new Rule(dependentId)
+                    {
+                        Description = "Dependent",
+                        Expression = "true",
+                        IsActive = true,
+                        DependsOnRuleId = depId
+                    }
+                }
+            };
+
+            workflow.Validate();
+            workflow.Compile(_parameters);
+
+            var chunks = new List<RuleResult[]>();
+            // Buffer large enough to hold every rule in one chunk if dependencies were ignored.
+            await foreach (var chunk in workflow.ExecuteBufferedAsync(_parameters, bufferSize: 10, cancellationToken: TestContext.Current.CancellationToken))
+            {
+                chunks.Add(chunk);
+            }
+
+            int ChunkOf(Guid id) => chunks.FindIndex(c => c.Any(r => r.RuleId == id));
+
+            var depChunk = ChunkOf(depId);
+            var dependentChunk = ChunkOf(dependentId);
+
+            depChunk.Should().BeGreaterThanOrEqualTo(0);
+            dependentChunk.Should().BeGreaterThan(depChunk,
+                "a dependent rule must never share a buffer chunk with (or precede) its dependency");
+        }
+
+        [Fact]
+        public async Task ExecuteBufferedAsync_BufferSizeZero_Throws()
+        {
+            var workflow = new Workflow
+            {
+                Description = "Bad buffer size",
+                Rules = new List<Rule> { new Rule { Description = "R1", Expression = "true", IsActive = true } }
+            };
+            workflow.Compile(_parameters);
+
+            var act = async () =>
+            {
+                await foreach (var _ in workflow.ExecuteBufferedAsync(_parameters, bufferSize: 0, cancellationToken: TestContext.Current.CancellationToken))
+                {
+                }
+            };
+
+            await act.Should().ThrowAsync<ArgumentOutOfRangeException>();
+        }
+
+        [Fact]
         public async Task ExecuteBufferedAsync_BufferSizeEqualsRuleCount_SingleChunk()
         {
             var workflow = new Workflow

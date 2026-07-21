@@ -39,8 +39,13 @@ namespace RoslynRules.Execution
                 return nodeList.OrderBy(n => n, priorityComparer).ToList();
             }
 
-            var inDegree = new Dictionary<Guid, int>();
-            var adjacency = new Dictionary<Guid, List<Guid>>();
+            // Lookup by id so neighbor resolution is O(1) instead of O(n) per edge.
+            var byId = new Dictionary<Guid, T>(nodeList.Count);
+            foreach (var node in nodeList)
+                byId[getId(node)] = node;
+
+            var inDegree = new Dictionary<Guid, int>(nodeList.Count);
+            var adjacency = new Dictionary<Guid, List<Guid>>(nodeList.Count);
 
             foreach (var node in nodeList)
             {
@@ -52,6 +57,9 @@ namespace RoslynRules.Execution
             foreach (var node in nodeList)
             {
                 var depId = getDependencyId(node);
+                // A dependency on a node outside this set (inactive/missing) is treated as
+                // "no dependency": the node runs as independent. Callers validate dangling
+                // dependencies separately; all execution paths tolerate them uniformly.
                 if (depId.HasValue && adjacency.ContainsKey(depId.Value))
                 {
                     adjacency[depId.Value].Add(getId(node));
@@ -59,38 +67,45 @@ namespace RoslynRules.Execution
                 }
             }
 
-            var result = new List<T>();
-            var queue = new SortedSet<T>(priorityComparer);
+            var result = new List<T>(nodeList.Count);
 
-            // Start with all nodes that have no dependencies
-            foreach (var node in nodeList.Where(n => inDegree[getId(n)] == 0))
-            {
-                queue.Add(node);
-            }
+            // Ready set of nodes with no remaining in-edges. A List (not SortedSet) is used
+            // deliberately: SortedSet collapses elements the comparer reports as equal, which
+            // would silently drop distinct nodes of equal priority and misfire cycle detection.
+            var ready = new List<T>();
+            foreach (var node in nodeList)
+                if (inDegree[getId(node)] == 0)
+                    ready.Add(node);
 
-            while (queue.Count > 0)
+            while (ready.Count > 0)
             {
-                var current = queue.Min;
-                if (current == null) break;
-                queue.Remove(current);
+                // Select the highest-priority ready node (Compare(a,b) < 0 => a first).
+                var minIndex = 0;
+                for (int i = 1; i < ready.Count; i++)
+                {
+                    if (priorityComparer.Compare(ready[i], ready[minIndex]) < 0)
+                        minIndex = i;
+                }
+
+                var current = ready[minIndex];
+                ready.RemoveAt(minIndex);
                 result.Add(current);
 
-                var currentId = getId(current);
-                foreach (var neighborId in adjacency[currentId])
+                foreach (var neighborId in adjacency[getId(current)])
                 {
-                    inDegree[neighborId]--;
-                    if (inDegree[neighborId] == 0)
-                    {
-                        var neighbor = nodeList.First(n => getId(n) == neighborId);
-                        queue.Add(neighbor);
-                    }
+                    if (--inDegree[neighborId] == 0)
+                        ready.Add(byId[neighborId]);
                 }
             }
 
             // Cycle detection: if we didn't process all nodes, there's a cycle
             if (result.Count != nodeList.Count)
             {
-                var unprocessed = nodeList.First(n => !result.Any(r => getId(r) == getId(n)));
+                var processed = new HashSet<Guid>(result.Count);
+                foreach (var r in result)
+                    processed.Add(getId(r));
+
+                var unprocessed = nodeList.First(n => !processed.Contains(getId(n)));
                 throw new CircularReferenceException(
                     getId(unprocessed),
                     $"Dependency cycle detected at node '{unprocessed}'");

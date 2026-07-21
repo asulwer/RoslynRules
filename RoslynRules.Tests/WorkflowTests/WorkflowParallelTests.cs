@@ -51,6 +51,41 @@ namespace RoslynRules.Tests.WorkflowTests
         }
 
         [Fact]
+        public void ExecuteParallel_DanglingDependency_ToleratedLikeSequentialExecute()
+        {
+            // A rule depends on an id that is not an active rule in this workflow.
+            var dependent = new Rule
+            {
+                Description = "Depends on a missing rule",
+                Expression = "customer.Age > 0",
+                IsActive = true,
+                DependsOnRuleId = System.Guid.NewGuid() // points at nothing in this workflow
+            };
+
+            var workflow = new Workflow
+            {
+                Rules =
+                {
+                    new Rule { Description = "Independent", Expression = "customer.Name != null", IsActive = true },
+                    dependent
+                }
+            };
+
+            workflow.Compile(_parameters, new[] { "RoslynRules.Tests" });
+
+            // Sequential Execute tolerates the dangling dependency (runs it as independent).
+            var sequential = workflow.Execute(_parameters).ToList();
+
+            // Parallel must behave identically — not throw a "dependency resolution" error.
+            var parallel = workflow.Invoking(w => w.ExecuteParallel(_parameters)).Should().NotThrow().Which;
+
+            sequential.Should().HaveCount(2);
+            sequential.All(r => r.Success).Should().BeTrue();
+            parallel.Should().HaveCount(2);
+            parallel.All(r => r.Success).Should().BeTrue();
+        }
+
+        [Fact]
         public void ExecuteParallel_InactiveWorkflow_ReturnsEmpty()
         {
             var workflow = new Workflow

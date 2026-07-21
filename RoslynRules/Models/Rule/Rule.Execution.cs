@@ -197,7 +197,12 @@ namespace RoslynRules.Models
 
             // For multi-parameter delegates, pass the full RuleParameter[] array.
             // For single-parameter delegates, pass just the value directly (fast path).
-            var paramValue = _compiledParameters.Length > 1 ? parameters : parameters[0].Value;
+            // Only materialized when there is a delegate to invoke — a parent rule with only
+            // child rules has no compiled delegate and may run with no parameters, so indexing
+            // parameters[0] must be avoided.
+            object? paramValue = null;
+            if (_compiledExpression != null || _compiledAction != null)
+                paramValue = _compiledParameters.Length > 1 ? parameters : parameters[0].Value;
 
             // Bottom-up: evaluate all active children first
             var childResults = new List<RuleResult>();
@@ -402,7 +407,12 @@ namespace RoslynRules.Models
 
             // For multi-parameter delegates, pass the full RuleParameter[] array.
             // For single-parameter delegates, pass just the value directly (fast path).
-            var paramValue = _compiledParameters.Length > 1 ? parameters : parameters[0].Value;
+            // Only materialized when there is a delegate to invoke — a parent rule with only
+            // child rules has no compiled delegate and may run with no parameters, so indexing
+            // parameters[0] must be avoided.
+            object? paramValue = null;
+            if (_compiledExpression != null || _compiledAction != null)
+                paramValue = _compiledParameters.Length > 1 ? parameters : parameters[0].Value;
 
             // Bottom-up: evaluate all active children first (async)
             var childResults = new List<RuleResult>();

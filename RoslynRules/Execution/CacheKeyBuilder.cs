@@ -2,6 +2,9 @@ using RoslynRules.Models;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -9,8 +12,16 @@ namespace RoslynRules.Execution
 {
     /// <summary>
     /// Builds cache keys from rule parameters for memoization.
-    /// Uses structural hashing for collections and identity hashing for
-    /// mutable reference types to prevent stale cache hits.
+    /// Uses structural, value-based hashing for collections and complex objects (public
+    /// readable properties) so that a mutated parameter yields a different key rather than a
+    /// stale cache hit. Recursion is bounded by <see cref="MaxCollectionDepth"/>; beyond that
+    /// depth it falls back to identity hashing to terminate safely on deep or cyclic graphs.
+    /// <para>
+    /// NOTE: because value hashing reads public properties, passing an object with lazy-loaded
+    /// members (e.g. an EF Core proxy with virtual navigation properties) as a cached parameter
+    /// can trigger those loads while the key is built. Prefer plain value/DTO types as cached
+    /// rule parameters, or leave <c>CacheDuration</c> unset for such rules.
+    /// </para>
     /// </summary>
     internal static class CacheKeyBuilder
     {
@@ -66,6 +77,15 @@ namespace RoslynRules.Execution
                 return;
             }
 
+            // Enums: key by underlying numeric value (distinct per member, no reflected state).
+            if (type.IsEnum)
+            {
+                sb.Append(type.FullName);
+                sb.Append('.');
+                sb.Append(((Enum)value).ToString("D"));
+                return;
+            }
+
             // Collections (arrays, lists, dictionaries, etc.) — structural hash
             if (value is IEnumerable enumerable && !(value is string))
             {
@@ -78,13 +98,62 @@ namespace RoslynRules.Execution
                 return;
             }
 
-            // Mutable reference types: use identity hash for stable cache keys.
-            // RuntimeHelpers.GetHashCode returns the object identity hash code,
-            // which is stable across mutations. This prevents stale cache hits
-            // when a mutable object's state changes between executions.
+            // Reference/complex types: hash by VALUE (public readable instance properties),
+            // so mutating an object between executions produces a different key and does not
+            // return a stale cached result. The depth guard bounds recursion on deep or
+            // cyclic graphs; beyond it we fall back to identity to terminate safely.
+            if (depth >= MaxCollectionDepth)
+            {
+                sb.Append(type.FullName);
+                sb.Append("#ref");
+                sb.Append(RuntimeHelpers.GetHashCode(value));
+                return;
+            }
+
+            AppendObjectByValue(sb, value, type, depth + 1);
+        }
+
+        /// <summary>
+        /// Appends a structural, value-based representation of an object's public readable
+        /// instance properties. Properties are ordered by name for a stable key. Indexers and
+        /// properties whose getters throw are skipped.
+        /// </summary>
+        [UnconditionalSuppressMessage("Trimming", "IL2070",
+            Justification = "Value-based cache keys reflect over parameter properties. This runs only at " +
+                "execution time for rules that were compiled via Roslyn (already a non-AOT, reflection-" +
+                "dependent path). Result caching for reference-type parameters is not supported under trimming/AOT.")]
+        private static void AppendObjectByValue(StringBuilder sb, object value, Type type, int depth)
+        {
             sb.Append(type.FullName);
-            sb.Append("#ref");
-            sb.Append(RuntimeHelpers.GetHashCode(value));
+            sb.Append('{');
+
+            var properties = type
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .Where(p => p.CanRead && p.GetIndexParameters().Length == 0)
+                .OrderBy(p => p.Name, StringComparer.Ordinal);
+
+            bool first = true;
+            foreach (var prop in properties)
+            {
+                object? propValue;
+                try
+                {
+                    propValue = prop.GetValue(value);
+                }
+                catch
+                {
+                    // A getter that throws must not break cache-key construction.
+                    continue;
+                }
+
+                if (!first) sb.Append(';');
+                sb.Append(prop.Name);
+                sb.Append('=');
+                AppendValue(sb, propValue, depth);
+                first = false;
+            }
+
+            sb.Append('}');
         }
 
         private static void AppendCollection(StringBuilder sb, IEnumerable enumerable, int depth)

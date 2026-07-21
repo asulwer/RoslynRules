@@ -130,6 +130,40 @@ namespace RoslynRules.Tests.Execution
         }
 
         [Fact]
+        public void Execute_AllChildrenPass_FirstFailureIsNull()
+        {
+            var parent = new Rule
+            {
+                Description = "Parent",
+                Expression = "true",
+                IsActive = true
+            };
+
+            parent.ChildRules.Add(new Rule
+            {
+                Description = "First child passes",
+                Expression = "customer.Age > 0",
+                IsActive = true
+            });
+            parent.ChildRules.Add(new Rule
+            {
+                Description = "Second child passes",
+                Expression = "customer.Age < 100",
+                IsActive = true
+            });
+
+            parent.Compile(_compiler, _parameters, _namespaces);
+
+            var result = parent.Execute(_parameters);
+
+            result.Success.Should().BeTrue();
+
+            // When no child fails, FirstFailure must be null (not a default RuleResult).
+            result.FirstFailure.Should().BeNull();
+            result.AllFailures.Should().BeEmpty();
+        }
+
+        [Fact]
         public void Execute_InactiveRule_ResultShowsInactive()
         {
             var rule = new Rule
