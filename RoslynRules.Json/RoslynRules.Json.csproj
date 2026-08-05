@@ -1,11 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>true</IsPackable>
-    <LangVersion>12.0</LangVersion>
+    <LangVersion>latest</LangVersion>
 
     <!-- Enable JSON source generators for trim/AOT support -->
     <IsTrimmable>true</IsTrimmable>

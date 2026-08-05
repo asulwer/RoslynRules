@@ -1,0 +1,25 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path="CHANGELOG.md" />
+    <File Path="CONTRIBUTING.md" />
+    <File Path="LICENSE.md" />
+    <File Path="README.md" />
+    <File Path="SECURITY.md" />
+  </Folder>
+  <Project Path="Demo/Demo.csproj">
+    <BuildType Solution="Release|x86" Project="Debug" />
+  </Project>
+  <Project Path="RoslynRules.Benchmarks/RoslynRules.Benchmarks.csproj" />
+  <Project Path="RoslynRules.EntityFrameworkCore/RoslynRules.EntityFrameworkCore.csproj" />
+  <Project Path="RoslynRules.Json/RoslynRules.Json.csproj" />
+  <Project Path="RoslynRules.Tests/RoslynRules.Tests.csproj">
+    <BuildType Solution="Release|x86" Project="Debug" />
+  </Project>
+  <Project Path="RoslynRules.Xml/RoslynRules.Xml.csproj" />
+  <Project Path="RoslynRules/RoslynRules.csproj" />
+</Solution>

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Target framework moved to `net10.0` only; dropped `net8.0` and `net9.0` multi-targeting across all projects
+- `LangVersion` bumped to `latest` (C# 14) for the core, Json, and Xml projects
+- Upgraded Entity Framework Core (and the InMemory provider) from `9.0.18` to `10.0.10`
+- Solution converted from the legacy `.sln` format to the XML-based `.slnx` format
+- CI workflows (`release.yml`, `aot.yml`, `codeql-advanced.yml`) now provision the .NET 10 SDK
+
+### Removed
+
+- Explicit `System.Text.Json` package reference — the type is now provided by the `net10.0` shared framework (resolves `NU1510`)
+
 ## [2026.6.3] - 2026-06-03
 
 ### Added
