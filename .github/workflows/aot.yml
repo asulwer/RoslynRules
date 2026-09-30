@@ -37,7 +37,11 @@ jobs:
         run: dotnet build RoslynRules.Tests --configuration Release --no-restore
 
       - name: Run xUnit AOT compatibility tests
-        run: dotnet test RoslynRules.Tests --filter "FullyQualifiedName~AotCompatibilityTests" --no-build --configuration Release
+        # xunit.v3 runs on Microsoft.Testing.Platform (MTP). On the .NET 10 SDK the
+        # legacy `dotnet test --filter` (VSTest) path is no longer supported for MTP
+        # projects (see https://aka.ms/dotnet-test-mtp-error), so invoke the built
+        # test runner directly and select the class with xUnit's native filter.
+        run: dotnet exec RoslynRules.Tests/bin/Release/net10.0/RoslynRules.Tests.dll -class "*AotCompatibilityTests"
 
       - name: Publish AOT smoke test (test project)
         run: |

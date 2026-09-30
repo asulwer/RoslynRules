@@ -30,7 +30,10 @@ jobs:
 
       - name: Run all tests
         continue-on-error: true
-        run: dotnet test --configuration Release --no-build --verbosity normal
+        # xunit.v3 runs on Microsoft.Testing.Platform; the .NET 10 SDK dropped the
+        # legacy `dotnet test` (VSTest) path for MTP projects. Run the built test
+        # runner directly instead (see https://aka.ms/dotnet-test-mtp-error).
+        run: dotnet exec RoslynRules.Tests/bin/Release/net10.0/RoslynRules.Tests.dll
 
       - name: Pack RoslynRules
         run: dotnet pack './RoslynRules/RoslynRules.csproj' --configuration Release --no-build --output ./nuget_packages
